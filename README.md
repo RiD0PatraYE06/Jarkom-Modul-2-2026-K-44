@@ -698,3 +698,217 @@ host abbey.k44.com
 host obladi.k44.com
 ping -c 2 delta.k44.com
 ```
+
+## 6.
+
+Cek Konfigurasi slave di tedd dan prab
+
+```bash 
+cat /etc/bind/named.conf.local
+```
+
+Cari SOA zone dan bandingkan nomer serialnya, pastikan keduanya sama persis
+```bash
+dig @192.233.5.2 k44.com SOA +short
+dig @192.233.5.3 k44.com SOA +short
+```
+
+Jika nomer serialnya berbeda , jalankan di tedd
+```bash
+rndc retransfer k44.com
+ls -l /var/cache/bind/ 
+```
+
+notify ulang di prab
+```bash
+rndc reload k44.com
+```
+
+tes dari tedd
+```bash
+dig @192.233.5.2 k44.com AXFR
+```
+
+Setelah itu verifikasi lagi dengan
+```bash
+dig @192.233.5.2 k44.com SOA +short
+dig @192.233.5.3 k44.com SOA +short
+```
+![alt text](<Screenshot 2026-09-29 180910.png>)
+
+## 7.
+
+Di prab Edit zona file
+
+```bash
+nano /etc/bind/db.k44.com
+```
+
+Tambahkan dibwah file
+```
+vault   IN  A       192.233.6.2
+vault   IN  A       192.233.6.3
+core    IN  A       192.233.6.4
+core    IN  A       192.233.6.5
+www     IN  CNAME   penny.k44.com.
+static  IN  CNAME   abbey.k44.com.
+
+```
+
+Naikkan angka serial dan pengecekan
+```
+named-checkzone k44.com /etc/bind/db.k44.com
+rndc reload k44.com
+```
+
+Verifikasi dari 2 klien berbeda
+```
+dig vault.k44.com +short     
+dig core.k44.com +short      
+dig www.k44.com +short       
+dig static.k44.com +short    
+```
+
+![alt text](<Screenshot 2026-09-29 184441.png>)
+
+## 8.
+
+Di prab, tambah deklarasikan 3 zona
+```bash
+nano /etc/bind/named.conf.local
+```
+
+```
+zone "3.233.192.in-addr.arpa" {
+    type master;
+    file "/etc/bind/db.192.233.3";
+    notify yes;
+    allow-transfer { 192.233.5.3; };
+};
+
+zone "4.233.192.in-addr.arpa" {
+    type master;
+    file "/etc/bind/db.192.233.4";
+    notify yes;
+    allow-transfer { 192.233.5.3; };
+};
+
+zone "6.233.192.in-addr.arpa" {
+    type master;
+    file "/etc/bind/db.192.233.6";
+    notify yes;
+    allow-transfer { 192.233.5.3; };
+};
+```
+
+Buat 3 file zona
+```
+cat > /etc/bind/db.192.233.3 <<'EOF'
+$TTL 604800
+@   IN  SOA prab.k44.com. root.k44.com. (
+            2026092901  ; serial
+            604800      ; refresh
+            86400       ; retry
+            2419200     ; expire
+            604800 )    ; negative cache
+@   IN  NS  prab.k44.com.
+@   IN  NS  tedd.k44.com.
+2   IN  PTR abbey.k44.com.
+EOF
+
+cat > /etc/bind/db.192.233.4 <<'EOF'
+$TTL 604800
+@   IN  SOA prab.k44.com. root.k44.com. (
+            2026092901
+            604800
+            86400
+            2419200
+            604800 )
+@   IN  NS  prab.k44.com.
+@   IN  NS  tedd.k44.com.
+2   IN  PTR penny.k44.com.
+EOF
+
+cat > /etc/bind/db.192.233.6 <<'EOF'
+$TTL 604800
+@   IN  SOA prab.k44.com. root.k44.com. (
+            2026092901
+            604800
+            86400
+            2419200
+            604800 )
+@   IN  NS  prab.k44.com.
+@   IN  NS  tedd.k44.com.
+2   IN  PTR obladi.k44.com.
+3   IN  PTR desmond.k44.com.
+4   IN  PTR oblada.k44.com.
+5   IN  PTR molly.k44.com.
+EOF
+```
+
+Pengecekan
+```
+named-checkconf
+named-checkzone 3.233.192.in-addr.arpa /etc/bind/db.192.233.3
+named-checkzone 4.233.192.in-addr.arpa /etc/bind/db.192.233.4
+named-checkzone 6.233.192.in-addr.arpa /etc/bind/db.192.233.6
+rndc reload
+```
+
+![alt text](image.png)
+
+Ketiganya harus menjawab OK
+
+Di tedd, tambah
+```bash
+nano /etc/bind/named.conf.local
+```
+
+```
+zone "3.233.192.in-addr.arpa" {
+    type slave;
+    file "/var/cache/bind/db.192.233.3";
+    masters { 192.233.5.2; };
+};
+
+zone "4.233.192.in-addr.arpa" {
+    type slave;
+    file "/var/cache/bind/db.192.233.4";
+    masters { 192.233.5.2; };
+};
+
+zone "6.233.192.in-addr.arpa" {
+    type slave;
+    file "/var/cache/bind/db.192.233.6";
+    masters { 192.233.5.2; };
+};
+```
+
+Cek
+```
+named-checkconf
+rndc reload
+ls -l /var/cache/bind/
+```
+![alt text](image-1.png)
+
+3 File harus muncul
+
+Validasi
+```
+dig -x 192.233.3.2 @192.233.5.2
+dig -x 192.233.4.2 @192.233.5.2
+dig -x 192.233.6.2 @192.233.5.2
+dig -x 192.233.6.5 @192.233.5.2
+```
+
+```
+dig -x 192.233.3.2 @192.233.5.3
+dig -x 192.233.4.2 @192.233.5.3
+dig -x 192.233.6.2 @192.233.5.3
+dig -x 192.233.6.3 @192.233.5.3
+dig -x 192.233.6.4 @192.233.5.3
+dig -x 192.233.6.5 @192.233.5.3
+```
+
+![alt text](<Screenshot 2026-09-29 210100.png>)
