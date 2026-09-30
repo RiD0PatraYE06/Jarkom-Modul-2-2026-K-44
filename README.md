@@ -1239,3 +1239,123 @@ curl http://www.k44.com/eternal/
 curl http://static.k44.com/orion/
 
 ```
+
+---
+
+### 16.
+
+Jalankan command berikut untuk www
+
+```bash
+ab -n 250 -c 10 http://www.k44.com/
+```
+
+lihat rangkumannya
+
+![alt text](<Screenshot 2026-09-30 202835.png>)
+
+Jalankan command berikut untuk static
+
+```bash
+ab -n 250 -c 10 http://static.k44.com/
+```
+
+Lihat rangkumannya
+
+![alt text](<Screenshot 2026-09-30 202748.png>)
+
+---
+
+### 17.
+
+Di prab, edit zona file
+```bash
+nano /etc/bind/db.k44.com
+```
+
+Tambahkan
+
+```
+alpha     IN    TXT    "alpha"
+beta      IN    TXT    "beta"
+gamma     IN    TXT    "gamma"
+delta     IN    TXT    "delta"
+epsilon   IN    TXT    "epsilon"
+```
+
+Reload dns
+
+```bash
+rndc reload k44.com
+```
+
+Cek txt dri prab
+
+```
+dig @192.233.5.2  alpha.k44.com TXT +short
+dig @192.233.5.2  beta.k44.com TXT +short
+dig @192.233.5.2  gamma.k44.com TXT +short
+dig @192.233.5.2  delta.k44.com TXT +short
+dig @192.233.5.2 epsilon.k44.com TXT +short
+```
+
+Hasil
+
+![alt text](<Screenshot 2026-09-30 212307.png>)
+
+Cek txt dari tedd
+
+![alt text](<Screenshot 2026-09-30 212503.png>)
+
+---
+
+### 18.
+
+Di prab, ubah TTL abey jadi 15 detik, dan naikkan no serial
+
+```bash
+nano /etc/bind/db.k44.com
+```
+
+```
+abbey    15    IN    A    IP_ABBEY_LAMA
+```
+
+```bash
+named-checkzone k44.com /etc/bind/db.k44.com
+rndc reload k44.com
+```
+#### Fase 1 — SEBELUM PERUBAHAN
+
+jalankan di client (beta)
+
+```bash
+dig abbey.k44.com A +noall +answer
+```
+
+Di prab ubah IP lama jadi IP fiktif, naikkan no seri
+
+```
+abbey    15    IN    A    203.0.113.77
+```
+
+```bash
+named-checkzone k44.com /etc/bind/db.k44.com
+rndc reload k44.com
+```
+
+#### Fase 2 — 3
+
+Tes
+
+```bash
+dig abbey.k44.com A +noall +answer
+```
+
+![alt text](<Screenshot 2026-09-30 235034.png>)
+
+---
+
+### 19.
+
+
