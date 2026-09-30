@@ -912,3 +912,330 @@ dig -x 192.233.6.5 @192.233.5.3
 ```
 
 ![alt text](<Screenshot 2026-09-29 210100.png>)
+
+---
+
+Berikut adalah ringkasan lengkap skrip, lokasi pemasangan, dan cara pengujian untuk seluruh rangkaian tugas dari **Nomor 11 sampai Nomor 15**.
+
+---
+
+## 📋 Rekapitulasi Skrip & Pengujian (Nomor 11 – 15)
+
+### 1. Soal Nomor 11: Setup Reverse Proxy & Load Balancer
+
+* **Lokasi Pemasangan & Skrip:**
+* **Backend Vault (`obladi` & `desmond`)** $\rightarrow$ File `/root/script.sh`:
+
+
+```bash
+#!/bin/bash
+hostname $(basename $0 | cut -d. -f1 2>/dev/null || echo "vault")
+apt-get update && apt-get install -y apache2 php libapache2-mod-php
+cat << 'EOF' > /var/www/html/index.php
+<?php
+echo "Response from Vault Backend: " . gethostname() . " (" . $_SERVER['SERVER_ADDR'] . ")\n";
+echo "Client IP Received: " . ($_SERVER['HTTP_X_REAL_IP'] ?? $_SERVER['HTTP_X_FORWARDED_FOR'] ?? $_SERVER['REMOTE_ADDR']) . "\n";
+echo "Host Header Received: " . $_SERVER['HTTP_HOST'] . "\n";
+?>
+EOF
+rm -f /var/www/html/index.html
+a2enmod php* 2>/dev/null
+/etc/init.d/apache2 restart
+
+```
+
+
+* **Backend Core (`oblada` & `molly`)** $\rightarrow$ File `/root/script.sh`:
+
+
+```bash
+#!/bin/bash
+hostname $(basename $0 | cut -d. -f1 2>/dev/null || echo "core")
+apt-get update && apt-get install -y nginx php-fpm
+cat << 'EOF' > /var/www/html/index.php
+<?php
+echo "Response from Core Backend: " . gethostname() . " (" . $_SERVER['SERVER_ADDR'] . ")\n";
+echo "Client IP Received: " . ($_SERVER['HTTP_X_REAL_IP'] ?? $_SERVER['HTTP_X_FORWARDED_FOR'] ?? $_SERVER['REMOTE_ADDR']) . "\n";
+echo "Host Header Received: " . $_SERVER['HTTP_HOST'] . "\n";
+?>
+EOF
+cat << 'EOF' > /etc/nginx/sites-available/default
+server {
+    listen 80 default_server;
+    root /var/www/html;
+    index index.php index.html;
+    server_name _;
+    location / { try_files $uri $uri/ =404; }
+    location ~ \.php$ {
+        include snippets/fastcgi-php.conf;
+        fastcgi_pass unix:/run/php/php-fpm.sock;
+    }
+}
+EOF
+/etc/init.d/php8.4-fpm start 2>/dev/null || /etc/init.d/php8.2-fpm start 2>/dev/null || php-fpm
+/etc/init.d/nginx restart
+
+```
+
+
+* **Reverse Proxy `penny` (Apache)** $\rightarrow$ File `/root/script.sh`:
+
+
+```bash
+#!/bin/bash
+hostname penny
+apt-get update && apt-get install -y apache2 php libapache2-mod-php
+a2enmod proxy proxy_http headers rewrite balancer lbmethod_byrequests
+cat << 'EOF' > /etc/apache2/sites-available/vault-proxy.conf
+<VirtualHost *:80>
+    ServerName penny.k44.com
+    ServerAlias vault.k44.com www.k44.com k44.com
+    ProxyRequests Off
+    ProxyPreserveHost On
+    <Proxy balancer://vaultcluster>
+        BalancerMember http://192.233.6.2:80
+        BalancerMember http://192.233.6.3:80
+    </Proxy>
+    RequestHeader set X-Real-IP "%{REMOTE_ADDR}s"
+    RequestHeader set X-Forwarded-For "%{REMOTE_ADDR}s"
+    ProxyPass / balancer://vaultcluster/
+    ProxyPassReverse / balancer://vaultcluster/
+</VirtualHost>
+EOF
+a2ensite vault-proxy.conf && a2dissite 000-default.conf
+/etc/init.d/apache2 restart
+
+```
+
+
+* **Reverse Proxy `abbey` (Nginx)** $\rightarrow$ File `/root/script.sh`:
+
+
+```bash
+#!/bin/bash
+hostname abbey
+apt-get update && apt-get install -y nginx
+cat << 'EOF' > /etc/nginx/sites-available/core-proxy
+upstream core_backend {
+    server 192.233.6.4:80;
+    server 192.233.6.5:80;
+}
+server {
+    listen 80;
+    server_name abbey.k44.com core.k44.com static.k44.com;
+    location / {
+        proxy_pass http://core_backend;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+}
+EOF
+ln -sf /etc/nginx/sites-available/core-proxy /etc/nginx/sites-enabled/
+rm -f /etc/nginx/sites-enabled/default
+/etc/init.d/nginx restart
+
+```
+
+
+
+
+* **Cara Pengujian (Di Terminal `alpha`):**
+
+```bash
+curl http://penny.k44.com
+curl http://abbey.k44.com
+
+```
+
+
+
+---
+
+### 2. Soal Nomor 12: Basic Authentication pada Path `/admin` di Penny
+
+* **Lokasi Pemasangan & Skrip:**
+* **Node `penny**` $\rightarrow$ File `/root/script.sh`:
+
+
+```bash
+#!/bin/bash
+hostname penny
+apt-get update && apt-get install -y apache2 php libapache2-mod-php apache2-utils
+a2enmod proxy proxy_http headers rewrite balancer lbmethod_byrequests auth_basic
+htpasswd -bc /etc/apache2/.htpasswd prabs "pakar_pinter_jadi_gob***"
+cat << 'EOF' > /etc/apache2/sites-available/vault-proxy.conf
+<VirtualHost *:80>
+    ServerName penny.k44.com
+    ServerAlias vault.k44.com www.k44.com k44.com
+    ProxyRequests Off
+    ProxyPreserveHost On
+    <Proxy balancer://vaultcluster>
+        BalancerMember http://192.233.6.2:80
+        BalancerMember http://192.233.6.3:80
+    </Proxy>
+    RequestHeader set X-Real-IP "%{REMOTE_ADDR}s"
+    RequestHeader set X-Forwarded-For "%{REMOTE_ADDR}s"
+    <Location /admin>
+        AuthType Basic
+        AuthName "Restricted Area - Sindikat Admin"
+        AuthUserFile /etc/apache2/.htpasswd
+        Require valid-user
+    </Location>
+    ProxyPass / balancer://vaultcluster/
+    ProxyPassReverse / balancer://vaultcluster/
+</VirtualHost>
+EOF
+a2ensite vault-proxy.conf && a2dissite 000-default.conf
+/etc/init.d/apache2 restart
+
+```
+
+
+
+
+* **Cara Pengujian (Di Terminal `alpha`):**
+
+```bash
+curl -i http://penny.k44.com/admin
+curl -i -u prabs:pakar_pinter_jadi_gob*** http://penny.k44.com/admin
+
+```
+
+
+
+---
+
+### 3. Soal Nomor 13: Redirection (301 Permanent & 302 Temporary)
+
+* **Lokasi Pemasangan & Skrip:**
+* **Node `penny` (Apache - 301 ke `[www.k44.com](https://www.k44.com)`)** $\rightarrow$ Perbarui blok `VirtualHost` di `/root/script.sh`:
+
+
+```apache
+RewriteEngine On
+RewriteCond %{HTTP_HOST} ^192\.233\.4\.2$ [OR]
+RewriteCond %{HTTP_HOST} ^penny\.k44\.com$ [NC]
+RewriteRule ^(.*)$ http://www.k44.com$1 [R=301,L]
+
+```
+
+
+* **Node `abbey` (Nginx - 302 ke `static.k44.com`)** $\rightarrow$ Perbarui blok `server` di `/root/script.sh`:
+
+
+```nginx
+server {
+    listen 80;
+    server_name abbey.k44.com 192.233.3.2;
+    return 302 http://static.k44.com$request_uri;
+}
+
+```
+
+
+
+
+* **Cara Pengujian (Di Terminal `alpha`):**
+
+```bash
+curl -I http://penny.k44.com
+curl -I http://abbey.k44.com
+
+```
+
+
+
+---
+
+### 4. Soal Nomor 14: Logging IP Asli Client pada Server Backend
+
+* **Lokasi Pemasangan & Skrip:**
+* **Backend Vault (`obladi` & `desmond` - Apache)** $\rightarrow$ `/root/script.sh`:
+
+
+```bash
+#!/bin/bash
+apt-get update && apt-get install -y apache2 php libapache2-mod-php
+sed -i 's/LogFormat "%h/LogFormat "%{X-Forwarded-For}i/g' /etc/apache2/apache2.conf
+cat << 'EOF' > /var/www/html/index.php
+<?php
+echo "Response from Vault Backend: " . gethostname() . " (" . $_SERVER['SERVER_ADDR'] . ")\n";
+echo "Client IP Received: " . ($_SERVER['HTTP_X_FORWARDED_FOR'] ?? $_SERVER['REMOTE_ADDR']) . "\n";
+?>
+EOF
+/etc/init.d/apache2 restart
+
+```
+
+
+* **Backend Core (`oblada` & `molly` - Nginx)** $\rightarrow$ Tambahkan konfigurasi `real_ip` pada blok `server` di `/root/script.sh`:
+
+
+```nginx
+set_real_ip_from 192.233.3.2; 
+real_ip_header X-Real-IP;
+
+```
+
+
+
+
+* **Cara Pengujian (Di Terminal `alpha` lalu Cek Log Backend):**
+
+```bash
+curl http://www.k44.com
+curl http://static.k44.com
+# Cek log:
+tail -n 2 /var/log/apache2/access.log  # (di obladi/desmond)
+tail -n 2 /var/log/nginx/access.log      # (di oblada/molly)
+
+```
+
+
+
+---
+
+### 5. Soal Nomor 15: Jalur Khusus Bypass Proxy (`/eternal` & `/orion`)
+
+* **Lokasi Pemasangan & Skrip:**
+* **Node `penny` (Path `/eternal` dengan PHP)** $\rightarrow$ Tambahkan ke VirtualHost di `/root/script.sh`:
+
+
+```apache
+Alias /eternal /var/www/eternal
+<Directory /var/www/eternal>
+    Require all granted
+</Directory>
+ProxyPass /eternal !
+
+```
+
+
+*(Serta buat folder `/var/www/eternal/index.php` berisi skrip PHP)*.
+
+
+* **Node `abbey` (Path `/orion` Statis Murni)** $\rightarrow$ Tambahkan ke server `static.k44.com` di `/root/script.sh`:
+
+
+```nginx
+location /orion {
+    alias /var/www/orion;
+    index index.html;
+}
+
+```
+
+
+*(Serta buat folder `/var/www/orion/index.html` berisi file HTML statis)*.
+
+
+
+
+* **Cara Pengujian (Di Terminal `alpha`):**
+
+```bash
+curl http://www.k44.com/eternal/
+curl http://static.k44.com/orion/
+
+```
