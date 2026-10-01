@@ -915,6 +915,184 @@ dig -x 192.233.6.5 @192.233.5.3
 
 ---
 
+### 9.
+
+Di obladi aktifkan apache
+
+```bash
+service apache2 start
+service apache2 status
+```
+
+Buat direktori arsip
+
+```
+mkdir -p /var/www/html/arsip
+ls -la /var/www/html/
+```
+
+Buat file untuk directory listing
+
+```bash
+echo "File arsip 1 - Obladi" > /var/www/html/arsip/file1.txt
+echo "File arsip 2 - Obladi" > /var/www/html/arsip/file2.txt
+echo "Data praktikum Modul 2" > /var/www/html/arsip/modul2.txt
+
+ls -la /var/www/html/arsip/
+```
+
+aktifkan dan restart
+
+```bash
+a2enmod autoindex
+
+service apache2 restart
+```
+
+Buat konfigurasi virtual host
+
+```bash
+nano /etc/apache2/sites-available/obladi.conf
+
+<VirtualHost *:80>
+    ServerName obladi.k44.com
+
+    DocumentRoot /var/www/html
+
+    <Directory /var/www/html>
+        Options Indexes FollowSymLinks
+        AllowOverride None
+        Require all granted
+    </Directory>
+
+    ErrorLog ${APACHE_LOG_DIR}/obladi-error.log
+    CustomLog ${APACHE_LOG_DIR}/obladi-access.log combined
+</VirtualHost>
+```
+
+Ulangi yang sama di desmond
+
+jalankan
+
+```bash
+a2ensite obladi.conf
+a2dissite 000-default.conf
+```
+
+Tes konfig & reload
+
+```bash
+apache2ctl configtest
+
+service apache2 reload
+```
+
+Tes dari client
+
+```bash
+dig obladi.k44.com
+curl http://obladi.k44.com/arsip/
+http://obladi.k44.com/arsip/
+```
+
+
+
+---
+
+### 10.
+
+Di oblada jalankan nginx
+
+```bash
+service nginx start
+nginx -t
+```
+
+Jalankan PHP-FPM
+
+```bash
+service php8.4-fpm start
+```
+
+buat dir aplikasi dan isi halaman beranda
+
+```bash
+mkdir -p /var/www/core
+nano /var/www/core/index.php
+
+<?php
+echo "<h1>Core - Oblada</h1>";
+echo "<p>Halaman Beranda</p>";
+?>
+```
+
+halaman profil
+
+```bash
+nano /var/www/core/profil.php
+
+<?php
+echo "<h1>Profil Oblada</h1>";
+echo "<p>Ini adalah halaman profil dari server Oblada.</p>";
+?>
+```
+
+```bash
+ls -lah /var/www/core/
+```
+
+Buat konfig nginx
+
+```bash
+nano /etc/nginx/sites-available/core
+
+server {
+    listen 80;
+    server_name core.k44.com;
+
+    root /var/www/core;
+    index index.php;
+
+    location = /profil {
+        rewrite ^/profil$ /profil.php last;
+    }
+
+    location / {
+        try_files $uri $uri/ =404;
+    }
+
+    location ~ \.php$ {
+        include snippets/fastcgi-php.conf;
+        fastcgi_pass unix:/run/php/php8.4-fpm.sock;
+    }
+}
+```
+
+Lakukan langkah yang sama di molly
+
+Aktifkan
+
+```bash
+ln -s /etc/nginx/sites-available/core /etc/nginx/sites-enabled/core
+rm -f /etc/nginx/sites-enabled/default
+nginx -t
+```
+
+TES PHP lokal
+
+```bash
+curl -H "Host: core.k44.com" http://127.0.0.1/
+curl -H "Host: core.k44.com" http://127.0.0.1/profil
+```
+
+Tes dari klien (gamma)
+
+```bash
+curl http://core.k44.com/
+curl http://core.k44.com/profil
+```
+
+
 Berikut adalah ringkasan lengkap skrip, lokasi pemasangan, dan cara pengujian untuk seluruh rangkaian tugas dari **Nomor 11 sampai Nomor 15**.
 
 ---
@@ -1388,5 +1566,7 @@ curl -i -H "Host: http.badssl.com" http://outbound.k44.com
 ---
 
 ### 20.
+
+Lakukan pengujian validasi untuk setiap node dan soal dengan melakukan restart
 
 
