@@ -1358,4 +1358,35 @@ dig abbey.k44.com A +noall +answer
 
 ### 19.
 
+Tambahkan di zona file prab
+
+```
+outbound    IN    CNAME    http.badssl.com.
+```
+
+validasi
+
+```bash
+named-checkzone k44.com /etc/bind/db.k44.com
+rndc reload k44.com
+```
+
+Verif cname di client
+
+```bash
+dig outbound.k44.com CNAME +short
+```
+
+Uji CURL
+
+```bash
+curl -i -H "Host: http.badssl.com" http://outbound.k44.com
+```
+
+![alt text](image-2.png)
+
+---
+
+### 20.
+
 
