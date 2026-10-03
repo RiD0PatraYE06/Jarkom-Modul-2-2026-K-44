@@ -992,10 +992,9 @@ Tes dari client
 ```bash
 dig obladi.k44.com
 curl http://obladi.k44.com/arsip/
-http://obladi.k44.com/arsip/
 ```
 
-
+![alt text](image-3.png)
 
 ---
 
@@ -1021,8 +1020,8 @@ mkdir -p /var/www/core
 nano /var/www/core/index.php
 
 <?php
-echo "<h1>Core - Oblada</h1>";
-echo "<p>Halaman Beranda</p>";
+echo "<h1>Halaman Beranda Core</h1>";
+echo "<p>Server: Oblada</p>";
 ?>
 ```
 
@@ -1033,7 +1032,6 @@ nano /var/www/core/profil.php
 
 <?php
 echo "<h1>Profil Oblada</h1>";
-echo "<p>Ini adalah halaman profil dari server Oblada.</p>";
 ?>
 ```
 
@@ -1091,6 +1089,8 @@ Tes dari klien (gamma)
 curl http://core.k44.com/
 curl http://core.k44.com/profil
 ```
+
+![alt text](image-4.png)
 
 
 Berikut adalah ringkasan lengkap skrip, lokasi pemasangan, dan cara pengujian untuk seluruh rangkaian tugas dari **Nomor 11 sampai Nomor 15**.
@@ -1496,7 +1496,7 @@ nano /etc/bind/db.k44.com
 ```
 
 ```
-abbey    15    IN    A    IP_ABBEY_LAMA
+abbey    15    IN    A    192.233.3.2
 ```
 
 ```bash
@@ -1510,6 +1510,15 @@ jalankan di client (beta)
 ```bash
 dig abbey.k44.com A +noall +answer
 ```
+### FASE 2
+
+Naikkan serial
+
+```bash
+dig abbey.k44.com A +noall +answer
+```
+
+### FASE 3
 
 Di prab ubah IP lama jadi IP fiktif, naikkan no seri
 
@@ -1522,7 +1531,8 @@ named-checkzone k44.com /etc/bind/db.k44.com
 rndc reload k44.com
 ```
 
-#### Fase 2 — 3
+
+```sleep 16```
 
 Tes
 
