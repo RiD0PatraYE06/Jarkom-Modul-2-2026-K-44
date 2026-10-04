@@ -1767,52 +1767,16 @@ curl -i -u prabs:pakar_pinter_jadi_gob*** http://penny.k44.com/admin
 #### Ekspektasi Output Hasil Pengujian
 
 1. **Hasil Tes 1: Tanpa Kredensial**
-```text
-HTTP/1.1 401 Unauthorized
-Date: Sun, 04 Oct 2026 16:00:00 GMT
-Server: Apache/2.4.68 (Debian)
-WWW-Authenticate: Basic realm="Restricted Area - Sindikat Admin"
-Content-Length: 460
-Content-Type: text/html; charset=iso-8859-1
 
-<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML 2.0//EN">
-<html><head>
-<title>401 Unauthorized</title>
-...
-
-```
+![Tanpa kredensial](./assets/12-Tanpa-Kredensial.png)
 
 2. **Hasil Tes 2: Kredensial Salah (`prabs:salahpassword`)**
-```text
-HTTP/1.1 401 Unauthorized
-Date: Sun, 04 Oct 2026 16:00:05 GMT
-Server: Apache/2.4.68 (Debian)
-WWW-Authenticate: Basic realm="Restricted Area - Sindikat Admin"
-Content-Length: 460
-Content-Type: text/html; charset=iso-8859-1
 
-<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML 2.0//EN">
-<html><head>
-<title>401 Unauthorized</title>
-...
-
-```
+![Kredensial salah](./assets/12-Salah-Kredensial.png)
 
 3. **Hasil Tes 3: Kredensial Benar (`prabs:pakar_pinter_jadi_gob***`)**
 
-```text
-HTTP/1.1 404 Not Found
-Date: Sun, 04 Oct 2026 16:00:10 GMT
-Server: Apache/2.4.68 (Debian)
-Content-Length: 270
-Content-Type: text/html; charset=iso-8859-1
-
-<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML 2.0//EN">
-<html><head>
-<title>404 Not Found</title>
-...
-
-```
+![Kredensial benar](./assets/12-Benar-Kredensial.png)
 
 ---
 
