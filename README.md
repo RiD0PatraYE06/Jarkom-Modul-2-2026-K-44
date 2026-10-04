@@ -216,6 +216,12 @@ iface eth0 inet static
     gateway 192.233.6.1
 ```
 
+### C. Dokumentasi
+
+**Hasil Topologi**
+
+![Topologi](./assets/01-Topologi.png)
+
 ---
 
 ## 2. Konfigurasi Network Address Translation (NAT) & Akses Internet
@@ -291,20 +297,11 @@ ping -c 4 8.8.8.8
 
 ```
 
-**Ekspektasi Output:**
+**Output:**
 
-```text
-PING 8.8.8.8 (8.8.8.8) 56(84) bytes of data.
-64 bytes from 8.8.8.8: icmp_seq=1 ttl=115 time=18.5 ms
-64 bytes from 8.8.8.8: icmp_seq=2 ttl=115 time=18.0 ms
-64 bytes from 8.8.8.8: icmp_seq=3 ttl=115 time=18.2 ms
-64 bytes from 8.8.8.8: icmp_seq=4 ttl=115 time=17.9 ms
+![Ping di node Prab](./assets/02-Ping.png)
 
---- 8.8.8.8 ping statistics ---
-4 packets transmitted, 4 received, 0% packet loss, time 3005ms
-rtt min/avg/max/mdev = 17.910/18.150/18.500/0.210 ms
-
-```
+---
 
 ## 3. Konektivitas Antar-Node, DNS Resolver, dan Otomatisasi Instalasi Tools
 
@@ -662,26 +659,12 @@ ping -c 2 deb.debian.org
 #### Ekspektasi Output Pengujian
 
 1. **Hasil Ping Inter-Subnet (`alpha` $\rightarrow$ `obladi`):**
-```text
-PING 192.233.6.2 (192.233.6.2) 56(84) bytes of data.
-64 bytes from 192.233.6.2: icmp_seq=1 ttl=63 time=1.12 ms
-64 bytes from 192.233.6.2: icmp_seq=2 ttl=63 time=0.98 ms
 
---- 192.233.6.2 ping statistics ---
-2 packets transmitted, 2 received, 0% packet loss, time 1002ms
-rtt min/avg/max/mdev = 0.984/1.052/1.120/0.068 ms
-```
+![Ping inter-subnet](./assets/03-Ping-Obladi.png)
 
 2. **Hasil Ping Domain Repositori (`deb.debian.org`):**
-```text
-PING debian.map.fastlydns.net (151.101.226.132) 56(84) bytes of data.
-64 bytes from 151.101.226.132: icmp_seq=1 ttl=55 time=19.4 ms
-64 bytes from 151.101.226.132: icmp_seq=2 ttl=55 time=18.7 ms
 
---- debian.map.fastlydns.net ping statistics ---
-2 packets transmitted, 2 received, 0% packet loss, time 1001ms
-rtt min/avg/max/mdev = 18.710/19.055/19.400/0.345 ms
-```
+![Ping domain repositori](./assets/03-Ping-Debian.png)
 
 ---
 
@@ -852,36 +835,18 @@ ping -c 2 k44.com
 #### Ekspektasi Output Hasil Pengujian
 
 1. **Hasil Query `dig` Domain Apex (`k44.com`):**
-```text
-root@alpha:~# dig @192.233.5.2 k44.com +short
-192.233.4.2
 
-root@alpha:~# dig @192.233.5.3 k44.com +short
-192.233.4.2
-
-```
+![Hasil dig domain apex](./assets/04-Dig.png)
 
 2. **Hasil Query `host` Hostname Name Server:**
-```text
-root@alpha:~# host prab.k44.com
-prab.k44.com has address 192.233.5.2
 
-root@alpha:~# host tedd.k44.com
-tedd.k44.com has address 192.233.5.3
-
-```
+![Hasil query host](./assets/04-Host.png)
 
 3. **Hasil Ping ke Apex Domain (`k44.com`):**
-```text
-root@alpha:~# ping -c 2 k44.com
-PING k44.com (192.233.4.2) 56(84) bytes of data.
-64 bytes from 192.233.4.2: icmp_seq=1 ttl=63 time=1.04 ms
-64 bytes from 192.233.4.2: icmp_seq=2 ttl=63 time=0.92 ms
 
---- k44.com ping statistics ---
-2 packets transmitted, 2 received, 0% packet loss, time 1001ms
-rtt min/avg/max/mdev = 0.920/0.980/1.040/0.060 ms
-```
+![Hasil ping domain apex](./assets/04-Ping.png)
+
+---
 
 ## 5. Konfigurasi Hostname System-Wide dan Pemetaan Domain Seluruh Node (k44.com)
 
@@ -1035,50 +1000,20 @@ ping -c 2 delta.k44.com
 #### Ekspektasi Output Hasil Pengujian
 
 1. **Hasil Uji Hostname System-Wide (`hostname`):**
-```text
-root@alpha:~# hostname
-alpha
-```
+
+![Uji hostname](./assets/05-Hostname.png)
 
 2. **Hasil Query DNS ke Master (`192.233.5.2`) & Slave (`192.233.5.3`):**
-```text
-root@alpha:~# host obladi.k44.com 192.233.5.2
-Using domain server:
-Name: 192.233.5.2
-Address: 192.233.5.2#53
-Aliases: 
 
-obladi.k44.com has address 192.233.6.2
-
-root@alpha:~# host obladi.k44.com 192.233.5.3
-Using domain server:
-Name: 192.233.5.3
-Address: 192.233.5.3#53
-Aliases: 
-
-obladi.k44.com has address 192.233.6.2
-```
+![Query DNS ke master & slave](./assets/05-Master&Slave.png)
 
 3. **Hasil Resolusi Domain Node Lain (`abbey` & `obladi`):**
-```text
-root@alpha:~# host abbey.k44.com
-abbey.k44.com has address 192.233.3.2
 
-root@alpha:~# host obladi.k44.com
-obladi.k44.com has address 192.233.6.2
-```
+![Resolusi domain lain](./assets/05-Abbey&Obladi.png)
 
 4. **Hasil Uji Ping Menggunakan FQDN (`delta.k44.com`):**
-```text
-root@alpha:~# ping -c 2 delta.k44.com
-PING delta.k44.com (192.233.2.2) 56(84) bytes of data.
-64 bytes from 192.233.2.2: icmp_seq=1 ttl=63 time=1.08 ms
-64 bytes from 192.233.2.2: icmp_seq=2 ttl=63 time=0.95 ms
 
---- delta.k44.com ping statistics ---
-2 packets transmitted, 2 received, 0% packet loss, time 1001ms
-rtt min/avg/max/mdev = 0.950/1.015/1.080/0.065 ms
-```
+![Ping dengan FQDN](./assets/05-Ping.png)
 
 ---
 
