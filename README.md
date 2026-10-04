@@ -1,7 +1,46 @@
 # Skrip Jarkom Modul 2
 
-## 1. Topologi dan Config
-rootkit
+## 1. Konfigurasi Topologi & Pengalamatan IP Network
+
+### A. Analisis Topologi & Alokasi Alamat IP
+
+Pada konfigurasi topologi **The Mesh**, node **`rootkit`** bertindak sebagai *router* utama (gateway) yang menghubungkan seluruh segmen jaringan internal ke koneksi luar (NAT WAN) serta membagi lalu lintas data ke 5 Switch utama.
+
+Pengalamatan IP menggunakan skema subnetting kelas C (`255.255.255.0` / `/24`) dengan prefix khusus kelompok **`192.233.X.Y`**.
+
+#### Tabel Alokasi Alamat IP Entitas
+
+| Segment / Fungsi | Node Name | Interface | IP Address | Subnet Mask | Default Gateway |
+| --- | --- | --- | --- | --- | --- |
+| **Router Utama** | `rootkit` | `eth0` | *DHCP (NAT)* | - | - |
+|  |  | `eth1` | `192.233.1.1` | `255.255.255.0` | - |
+|  |  | `eth2` | `192.233.2.1` | `255.255.255.0` | - |
+|  |  | `eth3` | `192.233.3.1` | `255.255.255.0` | - |
+|  |  | `eth4` | `192.233.4.1` | `255.255.255.0` | - |
+|  |  | `eth5` | `192.233.5.1` | `255.255.255.0` | - |
+|  |  | `eth5:0` | `192.233.6.1` | `255.255.255.0` | - |
+| **Operator (Sayap Kiri)** | `alpha` | `eth0` | `192.233.1.2` | `255.255.255.0` | `192.233.1.1` |
+|  | `beta` | `eth0` | `192.233.1.3` | `255.255.255.0` | `192.233.1.1` |
+|  | `gamma` | `eth0` | `192.233.1.4` | `255.255.255.0` | `192.233.1.1` |
+| **Operator (Sayap Kanan)** | `delta` | `eth0` | `192.233.2.2` | `255.255.255.0` | `192.233.2.1` |
+|  | `epsilon` | `eth0` | `192.233.2.3` | `255.255.255.0` | `192.233.2.1` |
+| **Gerbang Penyaring (Proxy)** | `abbey` | `eth0` | `192.233.3.2` | `255.255.255.0` | `192.233.3.1` |
+|  | `penny` | `eth0` | `192.233.4.2` | `255.255.255.0` | `192.233.4.1` |
+| **Penjaga Directory (DNS)** | `prab` | `eth0` | `192.233.5.2` | `255.255.255.0` | `192.233.5.1` |
+|  | `tedd` | `eth0` | `192.233.5.3` | `255.255.255.0` | `192.233.5.1` |
+| **Repository (Vault Backend)** | `obladi` | `eth0` | `192.233.6.2` | `255.255.255.0` | `192.233.6.1` |
+|  | `desmond` | `eth0` | `192.233.6.3` | `255.255.255.0` | `192.233.6.1` |
+| **Repository (Core Backend)** | `oblada` | `eth0` | `192.233.6.4` | `255.255.255.0` | `192.233.6.1` |
+|  | `molly` | `eth0` | `192.233.6.5` | `255.255.255.0` | `192.233.6.1` |
+
+---
+
+### B. Skrip Konfigurasi Jaringan `/etc/network/interfaces`
+
+#### Router / Gateway (`rootkit`)
+
+**File / Lokasi:** `/etc/network/interfaces` pada node **`rootkit`**
+
 ```bash
 # NAT WAN (eth0)
 auto eth0
@@ -44,7 +83,11 @@ iface eth5:0 inet static
     netmask 255.255.255.0
 ```
 
-alpha
+---
+
+#### Operator Client (`alpha`, `beta`, `gamma`, `delta`, `epsilon`)
+
+* **`alpha`** (`/etc/network/interfaces`):
 ```bash
 auto eth0
 iface eth0 inet static
@@ -53,7 +96,7 @@ iface eth0 inet static
     gateway 192.233.1.1
 ```
 
-beta
+* **`beta`** (`/etc/network/interfaces`):
 ```bash
 auto eth0
 iface eth0 inet static
@@ -62,7 +105,7 @@ iface eth0 inet static
     gateway 192.233.1.1
 ```
 
-gamma
+* **`gamma`** (`/etc/network/interfaces`):
 ```bash
 auto eth0
 iface eth0 inet static
@@ -71,7 +114,7 @@ iface eth0 inet static
     gateway 192.233.1.1
 ```
 
-delta
+* **`delta`** (`/etc/network/interfaces`):
 ```bash
 auto eth0
 iface eth0 inet static
@@ -80,7 +123,7 @@ iface eth0 inet static
     gateway 192.233.2.1
 ```
 
-epsilon
+* **`epsilon`** (`/etc/network/interfaces`):
 ```bash
 auto eth0
 iface eth0 inet static
@@ -89,7 +132,11 @@ iface eth0 inet static
     gateway 192.233.2.1
 ```
 
-abbey
+---
+
+#### Reverse Proxy (`abbey`, `penny`)
+
+* **`abbey`** (`/etc/network/interfaces`):
 ```bash
 auto eth0
 iface eth0 inet static
@@ -98,7 +145,7 @@ iface eth0 inet static
     gateway 192.233.3.1
 ```
 
-penny
+* **`penny`** (`/etc/network/interfaces`):
 ```bash
 auto eth0
 iface eth0 inet static
@@ -107,7 +154,11 @@ iface eth0 inet static
     gateway 192.233.4.1
 ```
 
-prab
+---
+
+#### Server DNS (`prab`, `tedd`)
+
+* **`prab`** (`/etc/network/interfaces`):
 ```bash
 auto eth0
 iface eth0 inet static
@@ -116,7 +167,7 @@ iface eth0 inet static
     gateway 192.233.5.1
 ```
 
-tedd
+* **`tedd`** (`/etc/network/interfaces`):
 ```bash
 auto eth0
 iface eth0 inet static
@@ -125,7 +176,11 @@ iface eth0 inet static
     gateway 192.233.5.1
 ```
 
-obladi
+---
+
+#### Server Backend Repository (`obladi`, `desmond`, `oblada`, `molly`)
+
+* **`obladi`** (`/etc/network/interfaces`):
 ```bash
 auto eth0
 iface eth0 inet static
@@ -134,7 +189,7 @@ iface eth0 inet static
     gateway 192.233.6.1
 ```
 
-desmond
+* **`desmond`** (`/etc/network/interfaces`):
 ```bash
 auto eth0
 iface eth0 inet static
@@ -143,7 +198,7 @@ iface eth0 inet static
     gateway 192.233.6.1
 ```
 
-oblada
+* **`oblada`** (`/etc/network/interfaces`):
 ```bash
 auto eth0
 iface eth0 inet static
@@ -152,7 +207,7 @@ iface eth0 inet static
     gateway 192.233.6.1
 ```
 
-molly
+* **`molly`** (`/etc/network/interfaces`):
 ```bash
 auto eth0
 iface eth0 inet static
@@ -161,54 +216,27 @@ iface eth0 inet static
     gateway 192.233.6.1
 ```
 
-## 2. Semua bisa internetan
-### rootkit
-Interface
-```bash
-# WAN Interface (Terhubung ke NAT1)
-auto eth0
-iface eth0 inet dhcp
-    # Menjalankan skrip IP Forwarding & NAT otomatis saat interface aktif
-    post-up bash /root/script.sh
+---
 
-# Switch 6 (Alpha, Beta, Gamma)
-auto eth1
-iface eth1 inet static
-    address 192.233.1.1
-    netmask 255.255.255.0
+## 2. Konfigurasi Network Address Translation (NAT) & Akses Internet
 
-# Switch 7 (Delta, Epsilon)
-auto eth2
-iface eth2 inet static
-    address 192.233.2.1
-    netmask 255.255.255.0
+### A. Analisis & Cara Kerja Konfigurasi NAT
 
-# Switch 4 (Abbey)
-auto eth3
-iface eth3 inet static
-    address 192.233.3.1
-    netmask 255.255.255.0
+Agar seluruh host di dalam jaringan internal **The Mesh** (seperti `alpha`, `prab`, `penny`, `obladi`, dll.) yang menggunakan alokasi IP privat (`192.233.X.Y`) dapat terhubung ke internet publik, node **`rootkit`** harus dikonfigurasikan sebagai router penyambung dengan fitur **Network Address Translation (NAT)**.
 
-# Switch 5 (Penny)
-auto eth4
-iface eth4 inet static
-    address 192.233.4.1
-    netmask 255.255.255.0
+Mekanisme kerja konfigurasi ini terdiri dari dua komponen utama:
 
-# Switch 1 -> Switch 2 (Prab, Tedd)
-auto eth5
-iface eth5 inet static
-    address 192.233.5.1
-    netmask 255.255.255.0
+1. **IP Forwarding Kernel (`sysctl -w net.ipv4.ip_forward=1`)**: Mengizinkan kernel Linux pada `rootkit` untuk meneruskan paket data antar-antarmuka (*interface*), yaitu memfasilitasi lalu lintas dari antarmuka internal (`eth1` hingga `eth5`) menuju antarmuka WAN (`eth0`).
+2. **IP Masquerading (`iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE`)**: Mengubah alamat IP asal (*source IP*) dari paket data yang berasal dari IP privat internal menjadi alamat IP publik/DHCP milik antarmuka `eth0` saat paket keluar menuju NAT/Internet. Saat balasan dari luar diterima, `rootkit` akan mengembalikan alamat IP tujuan ke host internal yang meminta.
 
-# Switch 1 -> Switch 3 (Obladi, Desmond, Oblada, Molly)
-auto eth5:0
-iface eth5:0 inet static
-    address 192.233.6.1
-    netmask 255.255.255.0
-```
+Aturan ini dipasang secara otomatis menggunakan pengait (*hook*) `post-up` pada file konfigurasi jaringan `eth0` agar NAT langsung aktif setiap kali antarmuka WAN menyala.
 
-Terminal
+---
+
+### B. Skrip Inisialisasi NAT Router (`rootkit`)
+
+**File / Lokasi:** `/root/script.sh` pada node **`rootkit`**
+
 ```bash
 #!/bin/bash
 
@@ -222,14 +250,86 @@ iptables -t nat -F
 iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
 ```
 
-tes di alpha dan prab
+*Catatan: Berikan izin eksekusi pada skrip dengan menjalankan `chmod +x /root/script.sh` pada terminal `rootkit`.*
+
+---
+
+### C. Cara Pengujian & Verifikasi Akses Internet
+
+Pengujian dilakukan dengan mengirimkan paket ICMP (`ping`) ke IP DNS Publik Google (`8.8.8.8`) dari representasi host internal pada segmen jaringan yang berbeda (misalnya klien `alpha` di Switch 6 dan server DNS `prab` di Switch 2).
+
+### D. Pengujian dari Klien (`alpha`)
+
+**Lokasi Eksekusi:** Terminal node **`alpha`**
+
 ```bash
 ping -c 4 8.8.8.8
 ```
 
-## 3. Connect semua node dan install tools
-### Interface
-alpha
+**Ekspektasi Output:**
+
+```text
+PING 8.8.8.8 (8.8.8.8) 56(84) bytes of data.
+64 bytes from 8.8.8.8: icmp_seq=1 ttl=115 time=18.2 ms
+64 bytes from 8.8.8.8: icmp_seq=2 ttl=115 time=17.9 ms
+64 bytes from 8.8.8.8: icmp_seq=3 ttl=115 time=18.1 ms
+64 bytes from 8.8.8.8: icmp_seq=4 ttl=115 time=17.8 ms
+
+--- 8.8.8.8 ping statistics ---
+4 packets transmitted, 4 received, 0% packet loss, time 3004ms
+rtt min/avg/max/mdev = 17.812/18.005/18.214/0.150 ms
+```
+
+---
+
+### E. Pengujian dari Server DNS (`prab`)
+
+**Lokasi Eksekusi:** Terminal node **`prab`**
+
+```bash
+ping -c 4 8.8.8.8
+
+```
+
+**Ekspektasi Output:**
+
+```text
+PING 8.8.8.8 (8.8.8.8) 56(84) bytes of data.
+64 bytes from 8.8.8.8: icmp_seq=1 ttl=115 time=18.5 ms
+64 bytes from 8.8.8.8: icmp_seq=2 ttl=115 time=18.0 ms
+64 bytes from 8.8.8.8: icmp_seq=3 ttl=115 time=18.2 ms
+64 bytes from 8.8.8.8: icmp_seq=4 ttl=115 time=17.9 ms
+
+--- 8.8.8.8 ping statistics ---
+4 packets transmitted, 4 received, 0% packet loss, time 3005ms
+rtt min/avg/max/mdev = 17.910/18.150/18.500/0.210 ms
+
+```
+
+## 3. Konektivitas Antar-Node, DNS Resolver, dan Otomatisasi Instalasi Tools
+
+### A. Analisis Konfigurasi & Cara Kerja
+
+Pada **Soal Nomor 3**, seluruh host non-router dalam jaringan *The Mesh* dikonfigurasikan agar dapat saling terhubung antar-subnet via router **`rootkit`**, dapat melakukan resolusi nama domain (*DNS resolution*) untuk mengunduh paket instalasi dari internet, serta menjalankan instalasi perangkat lunak pendukung secara otomatis saat sistem pertama kali diaktifkan.
+
+Terdapat tiga aspek penting dalam konfigurasi ini:
+
+1. **Injeksi DNS Resolver (`up` Directive):**
+Setiap antarmuka dikonfigurasikan dengan arahan `up` untuk menyuntikkan IP DNS resolver `192.168.122.1` (resolver default NAT lingkungan virtual) dan `8.8.8.8` (DNS Google) secara langsung ke dalam berkas `/etc/resolv.conf` saat antarmuka jaringan diaktifkan (*up*). Hal ini menjamin host dapat menyelesaikan nama domain seperti `deb.debian.org` untuk kebutuhan pengunduhan repositori tanpa bergantung pada DNS internal yang belum dikonfigurasi.
+2. **Default Gateway & Internal Routing:**
+Seluruh host diarahkan menggunakan IP interface `rootkit` yang berada di subnet-nya masing-masing sebagai *default gateway*. Hal ini memungkinkan lalu lintas data antar-subnet (misalnya dari Klien `alpha` di Subnet 1 menuju Backend `obladi` di Subnet 6) dapat diteruskan secara seamless oleh router `rootkit`.
+3. **Otomatisasi Instalasi Paket (`post-up` Directive):**
+Opsi `post-up bash /root/script.sh` digunakan pada setiap antarmuka untuk mengeksekusi skrip instalasi perangkat lunak sesuai peran node masing-masing (klien, DNS server, reverse proxy, maupun backend server) segera setelah koneksi jaringan aktif.
+
+---
+
+### B. Konfigurasi Interface Network (`/etc/network/interfaces`)
+
+Berikut adalah konfigurasi berkas `/etc/network/interfaces` pada seluruh node non-router:
+
+#### Operator Client (`alpha`, `beta`, `gamma`, `delta`, `epsilon`)
+
+* **`alpha`** (`/etc/network/interfaces`):
 ```bash
 auto eth0
 iface eth0 inet static
@@ -239,13 +339,14 @@ iface eth0 inet static
 
     dns-nameservers 192.168.122.1
 
-	up echo "nameserver 192.168.122.1" > /etc/resolv.conf
-	up echo "nameserver 8.8.8.8" >> /etc/resolv.conf
+    up echo "nameserver 192.168.122.1" > /etc/resolv.conf
+    up echo "nameserver 8.8.8.8" >> /etc/resolv.conf
 
     post-up bash /root/script.sh
 ```
 
-beta
+
+* **`beta`** (`/etc/network/interfaces`):
 ```bash
 auto eth0
 iface eth0 inet static
@@ -255,13 +356,14 @@ iface eth0 inet static
 
     dns-nameservers 192.168.122.1
 
-	up echo "nameserver 192.168.122.1" > /etc/resolv.conf
-	up echo "nameserver 8.8.8.8" >> /etc/resolv.conf
+    up echo "nameserver 192.168.122.1" > /etc/resolv.conf
+    up echo "nameserver 8.8.8.8" >> /etc/resolv.conf
 
     post-up bash /root/script.sh
 ```
 
-gamma
+
+* **`gamma`** (`/etc/network/interfaces`):
 ```bash
 auto eth0
 iface eth0 inet static
@@ -272,12 +374,13 @@ iface eth0 inet static
     dns-nameservers 192.168.122.1
 
     up echo "nameserver 192.168.122.1" > /etc/resolv.conf
-	up echo "nameserver 8.8.8.8" >> /etc/resolv.conf
+    up echo "nameserver 8.8.8.8" >> /etc/resolv.conf
 
     post-up bash /root/script.sh
 ```
 
-delta
+
+* **`delta`** (`/etc/network/interfaces`):
 ```bash
 auto eth0
 iface eth0 inet static
@@ -288,12 +391,13 @@ iface eth0 inet static
     dns-nameservers 192.168.122.1
 
     up echo "nameserver 192.168.122.1" > /etc/resolv.conf
-	up echo "nameserver 8.8.8.8" >> /etc/resolv.conf
+    up echo "nameserver 8.8.8.8" >> /etc/resolv.conf
 
     post-up bash /root/script.sh
 ```
 
-epsilon
+
+* **`epsilon`** (`/etc/network/interfaces`):
 ```bash
 auto eth0
 iface eth0 inet static
@@ -304,12 +408,16 @@ iface eth0 inet static
     dns-nameservers 192.168.122.1
 
     up echo "nameserver 192.168.122.1" > /etc/resolv.conf
-	up echo "nameserver 8.8.8.8" >> /etc/resolv.conf
+    up echo "nameserver 8.8.8.8" >> /etc/resolv.conf
 
     post-up bash /root/script.sh
 ```
 
-abbey
+---
+
+#### Reverse Proxy (`abbey`, `penny`)
+
+* **`abbey`** (`/etc/network/interfaces`):
 ```bash
 auto eth0
 iface eth0 inet static
@@ -320,12 +428,12 @@ iface eth0 inet static
     dns-nameservers 192.168.122.1
 
     up echo "nameserver 192.168.122.1" > /etc/resolv.conf
-	up echo "nameserver 8.8.8.8" >> /etc/resolv.conf
+    up echo "nameserver 8.8.8.8" >> /etc/resolv.conf
 
     post-up bash /root/script.sh
 ```
 
-penny
+* **`penny`** (`/etc/network/interfaces`):
 ```bash
 auto eth0
 iface eth0 inet static
@@ -336,12 +444,16 @@ iface eth0 inet static
     dns-nameservers 192.168.122.1
 
     up echo "nameserver 192.168.122.1" > /etc/resolv.conf
-	up echo "nameserver 8.8.8.8" >> /etc/resolv.conf
+    up echo "nameserver 8.8.8.8" >> /etc/resolv.conf
 
     post-up bash /root/script.sh
 ```
 
-prab
+---
+
+#### Server DNS (`prab`, `tedd`)
+
+* **`prab`** (`/etc/network/interfaces`):
 ```bash
 auto eth0
 iface eth0 inet static
@@ -352,12 +464,12 @@ iface eth0 inet static
     dns-nameservers 192.168.122.1
 
     up echo "nameserver 192.168.122.1" > /etc/resolv.conf
-	up echo "nameserver 8.8.8.8" >> /etc/resolv.conf
+    up echo "nameserver 8.8.8.8" >> /etc/resolv.conf
 
     post-up bash /root/script.sh
 ```
 
-tedd
+* **`tedd`** (`/etc/network/interfaces`):
 ```bash
 auto eth0
 iface eth0 inet static
@@ -368,12 +480,16 @@ iface eth0 inet static
     dns-nameservers 192.168.122.1
 
     up echo "nameserver 192.168.122.1" > /etc/resolv.conf
-	up echo "nameserver 8.8.8.8" >> /etc/resolv.conf
+    up echo "nameserver 8.8.8.8" >> /etc/resolv.conf
 
     post-up bash /root/script.sh
 ```
 
-obladi
+---
+
+#### Server Backend Repository (`obladi`, `desmond`, `oblada`, `molly`)
+
+* **`obladi`** (`/etc/network/interfaces`):
 ```bash
 auto eth0
 iface eth0 inet static
@@ -384,12 +500,12 @@ iface eth0 inet static
     dns-nameservers 192.168.122.1
 
     up echo "nameserver 192.168.122.1" > /etc/resolv.conf
-	up echo "nameserver 8.8.8.8" >> /etc/resolv.conf
+    up echo "nameserver 8.8.8.8" >> /etc/resolv.conf
 
     post-up bash /root/script.sh
 ```
 
-desmond
+* **`desmond`** (`/etc/network/interfaces`):
 ```bash
 auto eth0
 iface eth0 inet static
@@ -400,12 +516,12 @@ iface eth0 inet static
     dns-nameservers 192.168.122.1
 
     up echo "nameserver 192.168.122.1" > /etc/resolv.conf
-	up echo "nameserver 8.8.8.8" >> /etc/resolv.conf
+    up echo "nameserver 8.8.8.8" >> /etc/resolv.conf
 
     post-up bash /root/script.sh
 ```
 
-oblada
+* **`oblada`** (`/etc/network/interfaces`):
 ```bash
 auto eth0
 iface eth0 inet static
@@ -416,12 +532,12 @@ iface eth0 inet static
     dns-nameservers 192.168.122.1
 
     up echo "nameserver 192.168.122.1" > /etc/resolv.conf
-	up echo "nameserver 8.8.8.8" >> /etc/resolv.conf
+    up echo "nameserver 8.8.8.8" >> /etc/resolv.conf
 
     post-up bash /root/script.sh
 ```
 
-molly
+* **`molly`** (`/etc/network/interfaces`):
 ```bash
 auto eth0
 iface eth0 inet static
@@ -432,21 +548,21 @@ iface eth0 inet static
     dns-nameservers 192.168.122.1
 
     up echo "nameserver 192.168.122.1" > /etc/resolv.conf
-	up echo "nameserver 8.8.8.8" >> /etc/resolv.conf
+    up echo "nameserver 8.8.8.8" >> /etc/resolv.conf
 
     post-up bash /root/script.sh
 ```
 
-### Test
-coba di alpha dan obladi
-```bash
-ping -c 2 192.233.6.2
+---
 
-ping -c 2 deb.debian.org
-```
+### C. Skrip Instalasi Tools (`/root/script.sh`) Berdasarkan Peran Node
 
-### /root/script.sh
-client sayap kiri dan kanan
+Berikut adalah isi berkas `/root/script.sh` yang dipasang pada masing-masing kelompok node untuk kebutuhan otomasi instalasi dependensi software:
+
+#### Client Node (`alpha`, `beta`, `gamma`, `delta`, `epsilon`)
+
+Menginstal perkakas analisis DNS, transfer HTTP, dan autentikasi dasar.
+
 ```bash
 #!/bin/bash
 
@@ -454,7 +570,10 @@ apt-get update
 apt-get install -y dnsutils curl apache2-utils
 ```
 
-prab <-- (Master)
+#### DNS Server Master (`prab`)
+
+Menginstal paket DNS Server Bind9 dan perkakas pendukungnya.
+
 ```bash
 #!/bin/bash
 
@@ -462,7 +581,10 @@ apt-get update
 apt-get install -y bind9 bind9utils
 ```
 
-tedd <-- (Slave)
+#### DNS Server Slave (`tedd`)
+
+Menginstal paket DNS Server Bind9.
+
 ```bash
 #!/bin/bash
 
@@ -470,7 +592,10 @@ apt-get update
 apt-get install -y bind9
 ```
 
-abbey
+#### Reverse Proxy Core (`abbey`)
+
+Menginstal web server Nginx.
+
 ```bash
 #!/bin/bash
 
@@ -478,7 +603,10 @@ apt-get update
 apt-get install -y nginx
 ```
 
-penny
+#### Reverse Proxy Vault (`penny`)
+
+Menginstal web server Apache2, engine PHP, serta mengaktifkan modul-modul reverse proxy, header forwarding, rewrite, dan basic auth.
+
 ```bash
 #!/bin/bash
 
@@ -487,7 +615,10 @@ apt-get install -y apache2 php libapache2-mod-php
 a2enmod proxy proxy_http headers rewrite auth_basic
 ```
 
-obladi & desmond
+#### Vault Backend Repository (`obladi`, `desmond`)
+
+Menginstal web server Apache2.
+
 ```bash
 #!/bin/bash
 
@@ -495,7 +626,10 @@ apt-get update
 apt-get install -y apache2
 ```
 
-oblada & molly
+#### Core Backend Repository (`oblada`, `molly`)
+
+Menginstal web server Nginx dan pemroses skrip PHP-FPM.
+
 ```bash
 #!/bin/bash
 
@@ -503,10 +637,93 @@ apt-get update
 apt-get install -y nginx php-fpm
 ```
 
-## 4. Prab x Tedd & K44.com
-### script.sh
-prab
+---
+
+### D. Cara Pengujian & Verifikasi Hasil
+
+Pengujian dilakukan untuk memastikan **dua kriteria utama**: konektivitas routing antar-subnet internal dan keberhasilan resolusi domain ke repositori publik internet.
+
+#### Perintah Pengujian
+
+Jalankan perintah pengujian berikut pada terminal **`alpha`** (Klien) atau **`obladi`** (Backend):
+
+1. **Uji Konektivitas Lintas Subnet (Inter-Subnet Ping):**
 ```bash
+ping -c 2 192.233.6.2
+```
+
+2. **Uji Resolusi Domain & Akses Repositori Internet:**
+```bash
+ping -c 2 deb.debian.org
+```
+
+---
+
+#### Ekspektasi Output Pengujian
+
+1. **Hasil Ping Inter-Subnet (`alpha` $\rightarrow$ `obladi`):**
+```text
+PING 192.233.6.2 (192.233.6.2) 56(84) bytes of data.
+64 bytes from 192.233.6.2: icmp_seq=1 ttl=63 time=1.12 ms
+64 bytes from 192.233.6.2: icmp_seq=2 ttl=63 time=0.98 ms
+
+--- 192.233.6.2 ping statistics ---
+2 packets transmitted, 2 received, 0% packet loss, time 1002ms
+rtt min/avg/max/mdev = 0.984/1.052/1.120/0.068 ms
+```
+
+2. **Hasil Ping Domain Repositori (`deb.debian.org`):**
+```text
+PING debian.map.fastlydns.net (151.101.226.132) 56(84) bytes of data.
+64 bytes from 151.101.226.132: icmp_seq=1 ttl=55 time=19.4 ms
+64 bytes from 151.101.226.132: icmp_seq=2 ttl=55 time=18.7 ms
+
+--- debian.map.fastlydns.net ping statistics ---
+2 packets transmitted, 2 received, 0% packet loss, time 1001ms
+rtt min/avg/max/mdev = 18.710/19.055/19.400/0.345 ms
+```
+
+---
+
+## 4. Konfigurasi Master & Slave DNS Server (k44.com) serta Pembaruan Resolver Network
+
+### A. Analisis Konfigurasi & Cara Kerja
+
+Pada **Soal Nomor 4**, sistem penamaan domain internal (*Domain Name System*) dibangun secara berhierarki menggunakan **Bind9** pada dua server penjamin nama (*Penjaga Direktori*), yaitu **`prab`** sebagai **Master DNS Server** dan **`tedd`** sebagai **Slave DNS Server** untuk zona **`k44.com`**.
+
+Berikut adalah rincian komponen dan mekanisme kerja dari konfigurasi ini:
+
+1. **Konfigurasi Master DNS Server (`prab`):**
+* **SOA (Start of Authority):** Menunjuk ke `prab.k44.com.` dengan penanggung jawab `admin.k44.com.`.
+* **NS Record:** Dideklarasikan dua name server resmi untuk domain `k44.com`, yaitu `prab.k44.com.` dan `tedd.k44.com.`.
+* **A Record Domain Apex (`k44.com`):** Mengarah ke alamat IP **`penny`** (`192.233.4.2`) sebagai gerbang reverse proxy aplikasi dinamis.
+* **A Record Hostname:** Pemetaan nama `prab.k44.com` ke IP `192.233.5.2` dan `tedd.k44.com` ke IP `192.233.5.3`.
+* **Zone Transfer & Notification:** Parameter `allow-transfer { 192.233.5.3; };` dan `also-notify { 192.233.5.3; };` diaktifkan agar `prab` mengizinkan pengunduhan berkas zona dan memberikan notifikasi otomatis ke `tedd` setiap kali ada perubahan serial berkas DNS.
+* **Forwarders:** Mengarahkan query domain di luar `k44.com` ke gateway NAT `192.168.122.1`.
+
+
+2. **Konfigurasi Slave DNS Server (`tedd`):**
+* Mengkonfigurasikan tipe zona `slave` yang mereplikasi data zona `k44.com` secara otomatis dari master IP `192.233.5.2` (`prab`) dan menyimpannya di `/var/cache/bind/db.k44.com`.
+* `tedd` mampu menjawab query DNS secara *authoritative* mandiri apabila `prab` mengalami downtime (*redundancy/failover*).
+
+
+3. **Pembaruan Hierarki DNS Resolver pada Seluruh Host Non-Router:**
+* Seluruh host non-router memperbarui urutan pendaftaran DNS resolver pada berkas `/etc/resolv.conf` menjadi:
+1. `192.233.5.2` (IP `prab` - Primary DNS)
+2. `192.233.5.3` (IP `tedd` - Secondary DNS)
+3. `192.168.122.1` (NAT Gateway - Public DNS Resolver)
+
+---
+
+### B. Skrip Konfigurasi & Lokasi Pemasangan
+
+#### Skrip Konfigurasi DNS Master (`prab`)
+
+**File / Lokasi:** Eksekusi pada berkas `/root/script.sh` atau konfigurasi Bind9 di node **`prab`**
+
+```bash
+#!/bin/bash
+
 # A. Set Forwarders ke NAT Gateway
 cat << 'EOF' > /etc/bind/named.conf.options
 options {
@@ -551,16 +768,23 @@ prab    IN      A       192.233.5.2
 tedd    IN      A       192.233.5.3
 EOF
 
-# D. Check Syntax & Restart Service
+# D. Check Syntax & Reload Service
 named-checkconf
 named-checkzone k44.com /etc/bind/db.k44.com
 
-named -u bind
-rndc reload
+named -u bind 2>/dev/null || true
+rndc reload || /etc/init.d/bind9 restart
 ```
 
-tedd
+---
+
+#### Skrip Konfigurasi DNS Slave (`tedd`)
+
+**File / Lokasi:** Eksekusi pada berkas `/root/script.sh` atau konfigurasi Bind9 di node **`tedd`**
+
 ```bash
+#!/bin/bash
+
 # A. Deklarasi Zone Slave k44.com
 cat << 'EOF' > /etc/bind/named.conf.local
 zone "k44.com" {
@@ -570,35 +794,48 @@ zone "k44.com" {
 };
 EOF
 
-# B. Check Syntax & Restart Service
+# B. Check Syntax & Reload Service
 named-checkconf
 
-named -u bind
-rndc reload
+named -u bind 2>/dev/null || true
+rndc reload || /etc/init.d/bind9 restart
 ```
-### interface
-semua non-router
+
+---
+
+#### Konfigurasi Network Interface Seluruh Node Non-Router
+
+**File / Lokasi:** `/etc/network/interfaces` pada seluruh node non-router (`alpha`, `beta`, `gamma`, `delta`, `epsilon`, `abbey`, `penny`, `prab`, `tedd`, `obladi`, `desmond`, `oblada`, `molly`)
+
 ```bash
 auto eth0
 iface eth0 inet static
-	address <ip address>
-	netmask 255.255.255.0
-	gateway <ip address>
+    address <ip_address_node>
+    netmask 255.255.255.0
+    gateway <ip_gateway_subnet>
 
-	dns-nameservers 192.233.5.2 192.233.5.3 192.168.122.1
+    dns-nameservers 192.233.5.2 192.233.5.3 192.168.122.1
 
-	# Auto-run resolv.conf
-	up echo -e "nameserver 192.233.5.2\nnameserver 192.233.5.3\nnameserver 192.168.122.1" > /etc/resolv.conf
-	up echo "nameserver 8.8.8.8" >> /etc/resolv.conf 
+    # Auto-run pencatatan urutan DNS Resolver pada /etc/resolv.conf
+    up echo -e "nameserver 192.233.5.2\nnameserver 192.233.5.3\nnameserver 192.168.122.1" > /etc/resolv.conf
+    up echo "nameserver 8.8.8.8" >> /etc/resolv.conf 
 
-	# Auto-run skrip saat interface up
-	post-up bash /root/script.sh
+    # Auto-run skrip saat interface up
+    post-up bash /root/script.sh
 ```
 
-### tes
-Di alpha
+---
+
+### C. Cara Pengujian & Verifikasi Hasil
+
+Pengujian dilakukan dari terminal Klien **`alpha`** untuk memverifikasi bahwa query DNS domain apex maupun hostname dijawab secara *authoritative* baik oleh DNS Master (`prab`) maupun DNS Slave (`tedd`).
+
+#### Perintah Pengujian
+
+Jalankan perintah berikut pada terminal **`alpha`**:
+
 ```bash
-# 1. Tes query Apex Domain k44.com (Harus menjawab IP Penny: 192.233.4.2)
+# 1. Tes query Apex Domain k44.com ke Prab (Master) & Tedd (Slave)
 dig @192.233.5.2 k44.com +short
 dig @192.233.5.3 k44.com +short
 
@@ -606,34 +843,110 @@ dig @192.233.5.3 k44.com +short
 host prab.k44.com
 host tedd.k44.com
 
-# 3. Tes Ping Apex Domain
+# 3. Tes Ping ke Domain Apex k44.com
 ping -c 2 k44.com
 ```
 
-## 5. 
-### Set host name
-rootkit: hostnamectl set-hostname rootkit
-alpha: hostnamectl set-hostname alpha
-beta: hostnamectl set-hostname beta
-gamma: hostnamectl set-hostname gamma
-delta: hostnamectl set-hostname delta
-epsilon: hostnamectl set-hostname epsilon
-prab: hostnamectl set-hostname prab
-tedd: hostnamectl set-hostname tedd
-abbey: hostnamectl set-hostname abbey
-penny: hostnamectl set-hostname penny
-obladi: hostnamectl set-hostname obladi
-desmond: hostnamectl set-hostname desmond
-oblada: hostnamectl set-hostname oblada
-molly: hostnamectl set-hostname molly
+---
 
-### script.sh
-prab
+#### Ekspektasi Output Hasil Pengujian
+
+1. **Hasil Query `dig` Domain Apex (`k44.com`):**
+```text
+root@alpha:~# dig @192.233.5.2 k44.com +short
+192.233.4.2
+
+root@alpha:~# dig @192.233.5.3 k44.com +short
+192.233.4.2
+
+```
+
+2. **Hasil Query `host` Hostname Name Server:**
+```text
+root@alpha:~# host prab.k44.com
+prab.k44.com has address 192.233.5.2
+
+root@alpha:~# host tedd.k44.com
+tedd.k44.com has address 192.233.5.3
+
+```
+
+3. **Hasil Ping ke Apex Domain (`k44.com`):**
+```text
+root@alpha:~# ping -c 2 k44.com
+PING k44.com (192.233.4.2) 56(84) bytes of data.
+64 bytes from 192.233.4.2: icmp_seq=1 ttl=63 time=1.04 ms
+64 bytes from 192.233.4.2: icmp_seq=2 ttl=63 time=0.92 ms
+
+--- k44.com ping statistics ---
+2 packets transmitted, 2 received, 0% packet loss, time 1001ms
+rtt min/avg/max/mdev = 0.920/0.980/1.040/0.060 ms
+```
+
+## 5. Konfigurasi Hostname System-Wide dan Pemetaan Domain Seluruh Node (k44.com)
+
+### A. Analisis Konfigurasi & Cara Kerja
+
+Pada **Soal Nomor 5**, sistem jaringan *The Mesh* melakukan standardisasi identitas seluruh entitas baik secara lokal di tingkat sistem operasi (*system-wide hostname*) maupun secara global pada jaringan melalui pendaftaran record FQDN (*Fully Qualified Domain Name*) pada server DNS **`k44.com`**.
+
+Berikut adalah rincian komponen dan mekanisme teknis dari konfigurasi ini:
+
+1. **Penetapan Hostname System-Wide:**
+* Setiap node menjalankan perintah `hostname <nama_node>` untuk mendefinisikan nama host lokal yang dikenali oleh kernel Linux dan perintah sistem secara langsung.
+
+
+2. **Pembaruan Berkas Zona DNS Master (`prab`):**
+* **Inkremen Serial SOA:** Angka serial SOA pada berkas `/etc/bind/db.k44.com` dinaikkan menjadi **`2026092902`** (dari `2026092901` pada Soal 4). Perubahan nomor serial ini wajib dilakukan agar DNS Slave mengenali adanya pembaruan data pada DNS Master.
+* **Pengecualian Record `prab` & `tedd`:** A Record untuk `prab.k44.com` (`192.233.5.2`) dan `tedd.k44.com` (`192.233.5.3`) tetap dipertahankan sesuai konfigurasi awal pada Soal 4 tanpa perubahan.
+* **Pemetaan A Record Seluruh Entitas:** Menambahkan entri A Record baru untuk seluruh node non-DNS sesuai dengan segmen alamat IP statisnya:
+* **Klien Operator:** `alpha` (`192.233.1.2`), `beta` (`192.233.1.3`), `gamma` (`192.233.1.4`), `delta` (`192.233.2.2`), `epsilon` (`192.233.2.3`).
+* **Reverse Proxy:** `abbey` (`192.233.3.2`), `penny` (`192.233.4.2`).
+* **Repository Vault Backend:** `obladi` (`192.233.6.2`), `desmond` (`192.233.6.3`).
+* **Repository Core Backend:** `oblada` (`192.233.6.4`), `molly` (`192.233.6.5`).
+
+3. **Resinkronisasi & Transfer Zona DNS Slave (`tedd`):**
+* Berkas *cache* lama `/var/cache/bind/db.k44.com` pada `tedd` dihapus, diikuti *restart/reload* pada service `bind9`. Hal ini memicu `tedd` melakukan pemanggilan zona baru (*zone transfer*) secara paksa ke `prab` dan mereplikasi seluruh A Record entitas terbaru.
+
+---
+
+### B. Skrip Konfigurasi & Lokasi Pemasangan
+
+#### Penetapan Hostname System-Wide (Seluruh Node)
+
+Jalankan perintah penetapan hostname pada terminal masing-masing node:
+
 ```bash
+# Dipasang di terminal masing-masing node
+rootkit: hostname rootkit
+alpha:   hostname alpha
+beta:    hostname beta
+gamma:   hostname gamma
+delta:   hostname delta
+epsilon: hostname epsilon
+prab:    hostname prab
+tedd:    hostname tedd
+abbey:   hostname abbey
+penny:   hostname penny
+obladi:  hostname obladi
+desmond: hostname desmond
+oblada:  hostname oblada
+molly:   hostname molly
+```
+
+---
+
+#### Skrip Pembaruan Zona DNS Master (`prab`)
+
+**File / Lokasi:** Eksekusi pada berkas `/root/script.sh` atau konfigurasi Bind9 di node **`prab`**
+
+```bash
+#!/bin/bash
+
+# Pembaruan File Database Zone db.k44.com
 cat << 'EOF' > /etc/bind/db.k44.com
 $TTL    604800
 @       IN      SOA     prab.k44.com. admin.k44.com. (
-                              2026092902 ; Serial
+                              2026092902 ; Serial (Di-increment)
                                   604800 ; Refresh
                                    86400 ; Retry
                                  2419200 ; Expire
@@ -675,29 +988,99 @@ rndc reload k44.com
 rndc notify k44.com
 ```
 
-tedd
+---
+
+#### Skrip Resinkronisasi DNS Slave (`tedd`)
+
+**File / Lokasi:** Eksekusi pada berkas `/root/script.sh` di node **`tedd`**
+
 ```bash
+#!/bin/bash
+
+# Hapus cache zona lama dan paksa re-sync dari Master (Prab)
 rm -f /var/cache/bind/db.k44.com
 pkill named
-named -u bind
+named -u bind 2>/dev/null || true
 rndc reload
 ```
 
-## Tes
-node lain
+---
+
+### C. Cara Pengujian & Verifikasi Hasil
+
+Pengujian dilakukan untuk memverifikasi bahwa identitas lokal terpasang dengan benar, query DNS khusus ke Master & Slave mengembalikan IP yang presisi, serta komunikasi domain antar-node berjalan lancar.
+
+#### Perintah Pengujian
+
+Jalankan perintah pengujian pada terminal node Klien (misal **`alpha`**):
+
 ```bash
-# Uji Hostname System-Wide
+# 1. Uji Hostname System-Wide lokal
 hostname
 
-# Uji Query DNS Master & Slave
+# 2. Uji Query DNS langsung ke IP Master (Prab) & Slave (Tedd)
 host obladi.k44.com 192.233.5.2
 host obladi.k44.com 192.233.5.3
 
-# Uji Query Domain Node Lain
+# 3. Uji Resolusi Domain Node Lain secara Umum
 host abbey.k44.com
 host obladi.k44.com
+
+# 4. Uji Konektivitas Ping menggunakan Domain FQDN
 ping -c 2 delta.k44.com
 ```
+
+---
+
+#### Ekspektasi Output Hasil Pengujian
+
+1. **Hasil Uji Hostname System-Wide (`hostname`):**
+```text
+root@alpha:~# hostname
+alpha
+```
+
+2. **Hasil Query DNS ke Master (`192.233.5.2`) & Slave (`192.233.5.3`):**
+```text
+root@alpha:~# host obladi.k44.com 192.233.5.2
+Using domain server:
+Name: 192.233.5.2
+Address: 192.233.5.2#53
+Aliases: 
+
+obladi.k44.com has address 192.233.6.2
+
+root@alpha:~# host obladi.k44.com 192.233.5.3
+Using domain server:
+Name: 192.233.5.3
+Address: 192.233.5.3#53
+Aliases: 
+
+obladi.k44.com has address 192.233.6.2
+```
+
+3. **Hasil Resolusi Domain Node Lain (`abbey` & `obladi`):**
+```text
+root@alpha:~# host abbey.k44.com
+abbey.k44.com has address 192.233.3.2
+
+root@alpha:~# host obladi.k44.com
+obladi.k44.com has address 192.233.6.2
+```
+
+4. **Hasil Uji Ping Menggunakan FQDN (`delta.k44.com`):**
+```text
+root@alpha:~# ping -c 2 delta.k44.com
+PING delta.k44.com (192.233.2.2) 56(84) bytes of data.
+64 bytes from 192.233.2.2: icmp_seq=1 ttl=63 time=1.08 ms
+64 bytes from 192.233.2.2: icmp_seq=2 ttl=63 time=0.95 ms
+
+--- delta.k44.com ping statistics ---
+2 packets transmitted, 2 received, 0% packet loss, time 1001ms
+rtt min/avg/max/mdev = 0.950/1.015/1.080/0.065 ms
+```
+
+---
 
 ## 6.
 
