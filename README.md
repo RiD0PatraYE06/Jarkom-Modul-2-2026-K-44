@@ -1940,47 +1940,22 @@ curl -I http://abbey.k44.com
 
 1. **Hasil Pengujian di Reverse Proxy `penny` (Apache):**
 * **Pengujian via IP (`[http://192.233.4.2](http://192.233.4.2)`):**
-```text
-HTTP/1.1 301 Moved Permanently
-Date: Sun, 04 Oct 2026 16:15:00 GMT
-Server: Apache/2.4.68 (Debian)
-Location: http://www.k44.com/
-Content-Type: text/html; charset=iso-8859-1
-```
+
+![Penny -> ip](./assets/13-Penny-Test-IP.png)
 
 * **Pengujian via Subdomain (`[http://penny.k44.com](http://penny.k44.com)`):**
-```text
-HTTP/1.1 301 Moved Permanently
-Date: Sun, 04 Oct 2026 16:15:02 GMT
-Server: Apache/2.4.68 (Debian)
-Location: http://www.k44.com/
-Content-Type: text/html; charset=iso-8859-1
-```
+
+![Penny -> subdomain](./assets/13-Penny-Test-Subdomain.png)
 
 2. **Hasil Pengujian di Reverse Proxy `abbey` (Nginx):**
 * **Pengujian via IP (`[http://192.233.3.2](http://192.233.3.2)`):**
-```text
-HTTP/1.1 302 Moved Temporarily
-Server: nginx/1.22.1
-Date: Sun, 04 Oct 2026 16:15:05 GMT
-Content-Type: text/html
-Content-Length: 145
-Connection: keep-alive
-Location: http://static.k44.com/
-```
 
+![Abbey -> ip](./assets/13-Abbey-Test-IP.png)
 
 * **Pengujian via Subdomain (`[http://abbey.k44.com](http://abbey.k44.com)`):**
-```text
-HTTP/1.1 302 Moved Temporarily
-Server: nginx/1.22.1
-Date: Sun, 04 Oct 2026 16:15:07 GMT
-Content-Type: text/html
-Content-Length: 145
-Connection: keep-alive
-Location: http://static.k44.com/
 
-```
+![Abbey -> subdomain](./assets/13-Abbey-Test-Subdomain.png)
+
 ---
 
 ## 14. Konfigurasi Logging IP Asli Klien pada Backend Server (Area Core & Vault)
@@ -2110,15 +2085,17 @@ tail -n 2 /var/log/apache2/access.log
 
 #### Ekspektasi Output Hasil Pengujian
 
+**Terminal di Alpha**
+
+![Tes di alpha](./assets/14-Alpha.png)
+
 1. **Hasil Inspection Log pada Backend Area Core (`oblada` / `molly`):**
-```text
-192.233.1.2 - - [04/Oct/2026:16:30:01 +0700] "GET / HTTP/1.1" 200 95 "-" "curl/7.88.1"
-```
+
+![Core](./assets/14-Oblada&Molly.png)
 
 2. **Hasil Inspection Log pada Backend Area Vault (`obladi` / `desmond`):**
-```text
-192.233.1.2 - - [04/Oct/2026:16:30:05 +0700] "GET / HTTP/1.1" 200 96 "-" "curl/7.88.1"
-```
+
+![Vault](./assets/14-Obladi&Desmond.png)
 
 ---
 
@@ -2289,17 +2266,12 @@ curl http://static.k44.com/orion/
 ##### Ekspektasi Output Hasil Pengujian
 
 1. **Hasil Pengujian Jalur `/eternal/` di `penny`:**
-```html
-<h3>[Penny] Jalur Eternal Berhasil Diakses!</h3>
-File PHP ini dirender langsung oleh Penny. Waktu: 2026-09-30 10:14:51
-```
+
+![Eternal](./assets/15-Eternal.png)
 
 2. **Hasil Pengujian Jalur `/orion/` di `abbey`:**
-```html
-<h3>[Abbey] Jalur Orion Berhasil Diakses!</h3>
-<p>Ini adalah halaman statis murni tanpa proses rendering PHP.</p>
 
-```
+![Orion](./assets/15-Orion.png)
 
 ---
 
