@@ -1,4 +1,9 @@
-# Skrip Jarkom Modul 2
+# Laporan Praktikum Jarkom Modul 2
+
+| Nama | NRP |
+| --- | --- |
+| Nayarfa Syamahira Dyananta | 5027251046 |
+| Rido Patra Yudhistira Edwin | 5027251120 |
 
 ## 1. Konfigurasi Topologi & Pengalamatan IP Network
 
@@ -1410,23 +1415,47 @@ curl http://core.k44.com/profil
 
 ![alt text](image-4.png)
 
+---
 
-Berikut adalah ringkasan lengkap skrip, lokasi pemasangan, dan cara pengujian untuk seluruh rangkaian tugas dari **Nomor 11 sampai Nomor 15**.
+## 11. Konfigurasi Reverse Proxy & Load Balancing (Penny & Abbey)
 
 ---
 
-## 📋 Rekapitulasi Skrip & Pengujian (Nomor 11 – 15)
+### A. Analisis Konfigurasi & Cara Kerja
 
-### 1. Soal Nomor 11: Setup Reverse Proxy & Load Balancer
+Pada **Soal Nomor 11**, dikonfigurasikan dua pintu gerbang *Reverse Proxy* sekaligus *Load Balancer* untuk mendistribusikan lalu lintas HTTP ke dua kluster *backend* yang berbeda:
 
-* **Lokasi Pemasangan & Skrip:**
-* **Backend Vault (`obladi` & `desmond`)** $\rightarrow$ File `/root/script.sh`:
+1. **Reverse Proxy Area Vault (`penny` - Apache2):**
+* **Module Proxy & Balancer:** Mengaktifkan modul `proxy`, `proxy_http`, `balancer`, dan `lbmethod_byrequests` pada Apache untuk membentuk kluster *load balancing* dinamai `balancer://vaultcluster`.
+* **Anggota Backend:** Lalu lintas didistribusikan secara bergantian (*Round-Robin*) ke dua node *backend* area Vault, yaitu **`obladi`** (`192.233.6.2:80`) dan **`desmond`** (`192.233.6.3:80`).
+* **Header Forwarding:** Pengaturan `ProxyPreserveHost On` meneruskan *header* `Host` asli dari klien, sementara `RequestHeader set X-Real-IP` dan `X-Forwarded-For` menyuntikkan IP fisik pengakses (`REMOTE_ADDR`) ke *backend*.
 
+2. **Reverse Proxy Area Core (`abbey` - Nginx):**
+* **Upstream Block:** Menggunakan arahan `upstream core_backend` pada Nginx untuk mengelompokkan server *backend* area Core, yaitu **`oblada`** (`192.233.6.4:80`) dan **`molly`** (`192.233.6.5:80`).
+* **Header Forwarding:** Menggunakan `proxy_set_header Host $host`, `proxy_set_header X-Real-IP $remote_addr`, dan `proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for` untuk meneruskan identitas lengkap pengunjung.
+
+3. **Node Backend Repository (`obladi`, `desmond`, `oblada`, `molly`):**
+* Menjalankan layanan web server yang mengeksekusi skrip PHP untuk membaca *header* HTTP yang diterima (`HTTP_X_REAL_IP`, `HTTP_X_FORWARDED_FOR`, `HTTP_HOST`) dan menampilkan nama *hostname* node yang merespons.
+
+---
+
+### B. Skrip Konfigurasi & Lokasi Pemasangan
+
+#### Node Backend Area Vault (`obladi` & `desmond`)
+
+**File / Lokasi:** `/root/script.sh` pada node **`obladi`** dan **`desmond`**
 
 ```bash
 #!/bin/bash
+
+# Set hostname tanpa hostnamectl (DebiNet compatibility)
 hostname $(basename $0 | cut -d. -f1 2>/dev/null || echo "vault")
-apt-get update && apt-get install -y apache2 php libapache2-mod-php
+
+# Install Apache & PHP
+apt-get update
+apt-get install -y apache2 php libapache2-mod-php
+
+# Buat file index.php pencatat identitas
 cat << 'EOF' > /var/www/html/index.php
 <?php
 echo "Response from Vault Backend: " . gethostname() . " (" . $_SERVER['SERVER_ADDR'] . ")\n";
@@ -1434,20 +1463,31 @@ echo "Client IP Received: " . ($_SERVER['HTTP_X_REAL_IP'] ?? $_SERVER['HTTP_X_FO
 echo "Host Header Received: " . $_SERVER['HTTP_HOST'] . "\n";
 ?>
 EOF
+
+# Bersihkan default index.html dan jalankan Apache
 rm -f /var/www/html/index.html
 a2enmod php* 2>/dev/null
 /etc/init.d/apache2 restart
 
 ```
 
+---
 
-* **Backend Core (`oblada` & `molly`)** $\rightarrow$ File `/root/script.sh`:
+#### Node Backend Area Core (`oblada` & `molly`)
 
+**File / Lokasi:** `/root/script.sh` pada node **`oblada`** dan **`molly`**
 
 ```bash
 #!/bin/bash
+
+# Set hostname
 hostname $(basename $0 | cut -d. -f1 2>/dev/null || echo "core")
-apt-get update && apt-get install -y nginx php-fpm
+
+# Install Nginx & PHP-FPM
+apt-get update
+apt-get install -y nginx php-fpm
+
+# Buat file index.php pencatat identitas
 cat << 'EOF' > /var/www/html/index.php
 <?php
 echo "Response from Core Backend: " . gethostname() . " (" . $_SERVER['SERVER_ADDR'] . ")\n";
@@ -1455,284 +1495,845 @@ echo "Client IP Received: " . ($_SERVER['HTTP_X_REAL_IP'] ?? $_SERVER['HTTP_X_FO
 echo "Host Header Received: " . $_SERVER['HTTP_HOST'] . "\n";
 ?>
 EOF
+
+# Konfigurasi Nginx agar membaca file PHP via PHP-FPM
 cat << 'EOF' > /etc/nginx/sites-available/default
 server {
     listen 80 default_server;
     root /var/www/html;
     index index.php index.html;
+
     server_name _;
-    location / { try_files $uri $uri/ =404; }
+
+    location / {
+        try_files $uri $uri/ =404;
+    }
+
     location ~ \.php$ {
         include snippets/fastcgi-php.conf;
         fastcgi_pass unix:/run/php/php-fpm.sock;
     }
 }
 EOF
-/etc/init.d/php8.4-fpm start 2>/dev/null || /etc/init.d/php8.2-fpm start 2>/dev/null || php-fpm
+
+# Jalankan PHP-FPM & Nginx via /etc/init.d/
+/etc/init.d/php8.4-fpm start 2>/dev/null || /etc/init.d/php8.2-fpm start 2>/dev/null || /etc/init.d/php7.4-fpm start 2>/dev/null || php-fpm
 /etc/init.d/nginx restart
 
 ```
 
+---
 
-* **Reverse Proxy `penny` (Apache)** $\rightarrow$ File `/root/script.sh`:
+#### Reverse Proxy Area Vault (`penny`)
 
+**File / Lokasi:** `/root/script.sh` pada node **`penny`**
 
 ```bash
 #!/bin/bash
+
+# Set hostname
 hostname penny
-apt-get update && apt-get install -y apache2 php libapache2-mod-php
+
+# Install Apache & modul proxy
+apt-get update
+apt-get install -y apache2 php libapache2-mod-php
 a2enmod proxy proxy_http headers rewrite balancer lbmethod_byrequests
+
+# VirtualHost Reverse Proxy & Load Balancer ke Vault Cluster
 cat << 'EOF' > /etc/apache2/sites-available/vault-proxy.conf
 <VirtualHost *:80>
     ServerName penny.k44.com
     ServerAlias vault.k44.com www.k44.com k44.com
+
     ProxyRequests Off
     ProxyPreserveHost On
+
     <Proxy balancer://vaultcluster>
         BalancerMember http://192.233.6.2:80
         BalancerMember http://192.233.6.3:80
     </Proxy>
+
+    # Forwarding Header Identitas Pengunjung
     RequestHeader set X-Real-IP "%{REMOTE_ADDR}s"
     RequestHeader set X-Forwarded-For "%{REMOTE_ADDR}s"
+
     ProxyPass / balancer://vaultcluster/
     ProxyPassReverse / balancer://vaultcluster/
 </VirtualHost>
 EOF
-a2ensite vault-proxy.conf && a2dissite 000-default.conf
+
+# Aktifkan site & restart service Apache
+a2ensite vault-proxy.conf
+a2dissite 000-default.conf
 /etc/init.d/apache2 restart
 
 ```
 
+---
 
-* **Reverse Proxy `abbey` (Nginx)** $\rightarrow$ File `/root/script.sh`:
+#### Reverse Proxy Area Core (`abbey`)
 
+**File / Lokasi:** `/root/script.sh` pada node **`abbey`**
 
 ```bash
 #!/bin/bash
+
+# Set hostname
 hostname abbey
-apt-get update && apt-get install -y nginx
+
+# Install Nginx
+apt-get update
+apt-get install -y nginx
+
+# Configuration Reverse Proxy Nginx ke Core Cluster
 cat << 'EOF' > /etc/nginx/sites-available/core-proxy
 upstream core_backend {
     server 192.233.6.4:80;
     server 192.233.6.5:80;
 }
+
 server {
     listen 80;
     server_name abbey.k44.com core.k44.com static.k44.com;
+
     location / {
         proxy_pass http://core_backend;
+        
+        # Forwarding Header Identitas Pengunjung
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     }
 }
 EOF
+
+# Symlink & restart service Nginx
 ln -sf /etc/nginx/sites-available/core-proxy /etc/nginx/sites-enabled/
 rm -f /etc/nginx/sites-enabled/default
 /etc/init.d/nginx restart
-
 ```
-
-
-
-
-* **Cara Pengujian (Di Terminal `alpha`):**
-
-```bash
-curl http://penny.k44.com
-curl http://abbey.k44.com
-
-```
-
-
 
 ---
 
-### 2. Soal Nomor 12: Basic Authentication pada Path `/admin` di Penny
+### C. Cara Pengujian & Verifikasi Hasil
 
-* **Lokasi Pemasangan & Skrip:**
-* **Node `penny**` $\rightarrow$ File `/root/script.sh`:
+Pengujian dilakukan dari terminal Klien **`alpha`** dengan mengeksekusi `curl` secara berulang ke domain proxy `penny.k44.com` dan `abbey.k44.com`.
 
+#### Perintah Pengujian
+
+Jalankan perintah berikut pada terminal **`alpha`**:
+
+```bash
+# 1. Tes Reverse Proxy Penny (Apache -> Vault Cluster: obladi & desmond)
+curl http://penny.k44.com
+curl http://penny.k44.com
+
+# 2. Tes Reverse Proxy Abbey (Nginx -> Core Cluster: oblada & molly)
+curl http://abbey.k44.com
+curl http://abbey.k44.com
+```
+
+---
+
+#### Ekspektasi Output Hasil Pengujian
+
+1. **Hasil Pengujian Reverse Proxy `penny` (Area Vault):**
+* **Request Pertama:**
+
+![Tes penny melalui obladi](./assets/11-Obladi~Penny.png)
+
+* **Request Kedua:**
+
+![Test penny melalui desmond](./assets/11-Desmond~Penny.png)
+
+2. **Hasil Pengujian Reverse Proxy `abbey` (Area Core):**
+* **Request Pertama:**
+
+![Tes abbey melalui oblada](./assets/11-Oblada~Abbey.png)
+
+* **Request Kedua:**
+
+![Tes abbey melalui molly](./assets/11-Molly~Abbey.png)
+
+---
+
+## 12. Konfigurasi Basic Authentication pada Path Rahasia (`/admin`)
+
+---
+
+### A. Analisis Konfigurasi & Cara Kerja
+
+Pada **Soal Nomor 12**, mekanisme keamanan berbasis **HTTP Basic Authentication** diterapkan pada *reverse proxy* **`penny`** (Apache) untuk melindungi berkas/dokumen rahasia sindikat yang berada di dalam jalur (*path*) **`/admin`**.
+
+Berikut adalah rincian komponen dan mekanisme teknis dari konfigurasi ini:
+
+1. **Pembuatan Berkas Kredensial Terenkripsi (`htpasswd`):**
+* Menggunakan utilitas `apache2-utils` untuk membuat berkas `/etc/apache2/.htpasswd` yang menyimpan *pair* nama pengguna dan kata sandi terenkripsi.
+* Parameter `-b` mengizinkan pembuatan kata sandi langsung via argumen CLI (`pakar_pinter_jadi_gob***`), dan `-c` membuat berkas baru untuk pengguna **`prabs`**.
+
+2. **Pengaktifan Modul `auth_basic` & Blok `<Location /admin>`:**
+* Modul `auth_basic` diaktifkan pada Apache (`a2enmod auth_basic`).
+* Di dalam berkas VirtualHost `/etc/apache2/sites-available/vault-proxy.conf`, dibuat direktif `<Location /admin>` untuk menyaring seluruh permintaan yang menuju URL `[http://penny.k44.com/admin](http://penny.k44.com/admin)` atau domain turunan lainnya.
+* Direktif `AuthType Basic` menentukan jenis otentikasi standar HTTP, `AuthUserFile` menunjuk ke berkas `.htpasswd`, dan `Require valid-user` mewajibkan setiap pengakses memasukkan kredensial yang cocok sebelum permintaan diteruskan ke *backend*.
+
+3. **Mekanisme Respon HTTP Status Code:**
+* **401 Unauthorized:** Dikembalikan secara otomatis oleh Apache jika pengunjung mencoba mengakses `/admin` tanpa membawa *header* `Authorization` atau jika nama pengguna/kata sandi salah.
+* **200 OK / 404 Not Found (Pass Auth):** Dikembalikan jika kredensial cocok. Permintaan akan diteruskan ke kluster *backend* (`obladi`/`desmond`). Jika *folder* fisik `/admin` belum ada di *backend*, *backend* mengembalikan status `404 Not Found`, yang menandakan otentikasi di tingkat proxy telah **lolos/berhasil**.
+
+---
+
+### B. Skrip Konfigurasi & Lokasi Pemasangan
+
+#### Node Reverse Proxy `penny` (Apache)
+
+**File / Lokasi:** `/root/script.sh` pada node **`penny`**
 
 ```bash
 #!/bin/bash
+
+# Set hostname
 hostname penny
-apt-get update && apt-get install -y apache2 php libapache2-mod-php apache2-utils
+
+# Install Apache, PHP, dan utility htpasswd
+apt-get update
+apt-get install -y apache2 php libapache2-mod-php apache2-utils
 a2enmod proxy proxy_http headers rewrite balancer lbmethod_byrequests auth_basic
+
+# Buat berkas autentikasi terenkripsi untuk prabs
 htpasswd -bc /etc/apache2/.htpasswd prabs "pakar_pinter_jadi_gob***"
+
+# Konfigurasi VirtualHost Reverse Proxy Penny dengan Basic Auth /admin
 cat << 'EOF' > /etc/apache2/sites-available/vault-proxy.conf
 <VirtualHost *:80>
     ServerName penny.k44.com
     ServerAlias vault.k44.com www.k44.com k44.com
+
     ProxyRequests Off
     ProxyPreserveHost On
+
     <Proxy balancer://vaultcluster>
         BalancerMember http://192.233.6.2:80
         BalancerMember http://192.233.6.3:80
     </Proxy>
+
+    # Forwarding Header Identitas Pengunjung
     RequestHeader set X-Real-IP "%{REMOTE_ADDR}s"
     RequestHeader set X-Forwarded-For "%{REMOTE_ADDR}s"
+
+    # Basic Authentication pada path /admin (Soal 12)
     <Location /admin>
         AuthType Basic
         AuthName "Restricted Area - Sindikat Admin"
         AuthUserFile /etc/apache2/.htpasswd
         Require valid-user
     </Location>
+
     ProxyPass / balancer://vaultcluster/
     ProxyPassReverse / balancer://vaultcluster/
 </VirtualHost>
 EOF
-a2ensite vault-proxy.conf && a2dissite 000-default.conf
+
+# Aktifkan konfigurasi & restart service Apache
+a2ensite vault-proxy.conf
+a2dissite 000-default.conf
 /etc/init.d/apache2 restart
 
 ```
 
+---
 
+### C. Cara Pengujian & Verifikasi Hasil
 
+Pengujian dilakukan dari terminal Klien **`alpha`** dengan mengirimkan perintah `curl -i` (untuk melihat *header* respons HTTP) pada tiga skenario otentikasi.
 
-* **Cara Pengujian (Di Terminal `alpha`):**
+#### Perintah Pengujian
+
+Jalankan perintah berikut di terminal **`alpha`**:
 
 ```bash
+# 1. Tes Akses Tanpa Kredensial
 curl -i http://penny.k44.com/admin
+
+# 2. Tes Akses Dengan Kredensial Salah
+curl -i -u prabs:salahpassword http://penny.k44.com/admin
+
+# 3. Tes Akses Dengan Kredensial Benar
 curl -i -u prabs:pakar_pinter_jadi_gob*** http://penny.k44.com/admin
 
 ```
 
-
-
 ---
 
-### 3. Soal Nomor 13: Redirection (301 Permanent & 302 Temporary)
+#### Ekspektasi Output Hasil Pengujian
 
-* **Lokasi Pemasangan & Skrip:**
-* **Node `penny` (Apache - 301 ke `[www.k44.com](https://www.k44.com)`)** $\rightarrow$ Perbarui blok `VirtualHost` di `/root/script.sh`:
+1. **Hasil Tes 1: Tanpa Kredensial**
+```text
+HTTP/1.1 401 Unauthorized
+Date: Sun, 04 Oct 2026 16:00:00 GMT
+Server: Apache/2.4.68 (Debian)
+WWW-Authenticate: Basic realm="Restricted Area - Sindikat Admin"
+Content-Length: 460
+Content-Type: text/html; charset=iso-8859-1
 
-
-```apache
-RewriteEngine On
-RewriteCond %{HTTP_HOST} ^192\.233\.4\.2$ [OR]
-RewriteCond %{HTTP_HOST} ^penny\.k44\.com$ [NC]
-RewriteRule ^(.*)$ http://www.k44.com$1 [R=301,L]
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML 2.0//EN">
+<html><head>
+<title>401 Unauthorized</title>
+...
 
 ```
 
+2. **Hasil Tes 2: Kredensial Salah (`prabs:salahpassword`)**
+```text
+HTTP/1.1 401 Unauthorized
+Date: Sun, 04 Oct 2026 16:00:05 GMT
+Server: Apache/2.4.68 (Debian)
+WWW-Authenticate: Basic realm="Restricted Area - Sindikat Admin"
+Content-Length: 460
+Content-Type: text/html; charset=iso-8859-1
 
-* **Node `abbey` (Nginx - 302 ke `static.k44.com`)** $\rightarrow$ Perbarui blok `server` di `/root/script.sh`:
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML 2.0//EN">
+<html><head>
+<title>401 Unauthorized</title>
+...
 
+```
 
-```nginx
+3. **Hasil Tes 3: Kredensial Benar (`prabs:pakar_pinter_jadi_gob***`)**
+
+```text
+HTTP/1.1 404 Not Found
+Date: Sun, 04 Oct 2026 16:00:10 GMT
+Server: Apache/2.4.68 (Debian)
+Content-Length: 270
+Content-Type: text/html; charset=iso-8859-1
+
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML 2.0//EN">
+<html><head>
+<title>404 Not Found</title>
+...
+
+```
+
+---
+
+## 13. Konfigurasi Canonical Domain & Redirection HTTP (301 Permanent & 302 Temporary)
+
+### A. Analisis Konfigurasi & Cara Kerja
+
+Pada **Soal Nomor 13**, mekanisme *HTTP Redirection* diterapkan pada kedua pintu gerbang *reverse proxy* (`penny` dan `abbey`) untuk memastikan setiap permintaan dari klien luar dipaksa menggunakan nama domain kanonik resmi (*canonical domain name*), bukan melalui alamat IP mentah maupun *subdomain* non-kanonik.
+
+Berikut rincian teknis pelaksanaan pengalihan pada masing-masing server:
+
+1. **Pengalihan Permanen (301 Moved Permanently) pada `penny` (Apache):**
+* Mengaktifkan *engine* pengalihan URL Apache menggunakan modul `mod_rewrite` (`RewriteEngine On`).
+* Menyaring permintaan masuk berdasarkan *header* `Host` menggunakan kondisi `RewriteCond %{HTTP_HOST}` untuk mencocokkan akses via IP mentah (`192.233.4.2`) atau *subdomain* non-kanonik (`penny.k44.com`).
+* Aturan `RewriteRule ^(.*)$ [http://www.k44.com](http://www.k44.com)$1 [R=301,L]` memaksa server mengembalikan kode status **`301 Moved Permanently`** dengan *header* `Location` yang mengarah ke domain kanonik **`[www.k44.com](https://www.k44.com)`**.
+
+2. **Pengalihan Sementara (302 Found / Moved Temporarily) pada `abbey` (Nginx):**
+* Membuat blok `server` khusus pada Nginx yang secara eksplisit mendengarkan permintaan (*listen 80*) untuk *server_name* `abbey.k44.com` dan IP `192.233.3.2`.
+* Di dalam blok tersebut, instruksi `return 302 [http://static.k44.com](http://static.k44.com)$request_uri;` mengeksekusi pengalihan langsung berstatus **`302 Moved Temporarily`** menuju domain kanonik **`static.k44.com`** sambil mempertahankan URI permintaan asli.
+
+---
+
+### B. Skrip Konfigurasi & Lokasi Pemasangan
+
+#### Reverse Proxy Area Vault `penny` (Apache - Redirect 301)
+
+**File / Lokasi:** `/root/script.sh` pada node **`penny`**
+
+```bash
+#!/bin/bash
+
+# Set hostname
+hostname penny
+
+# Install Apache, PHP, dan utility htpasswd
+apt-get update
+apt-get install -y apache2 php libapache2-mod-php apache2-utils
+a2enmod proxy proxy_http headers rewrite balancer lbmethod_byrequests auth_basic
+
+# Buat berkas autentikasi terenkripsi untuk prabs (Soal 12)
+htpasswd -bc /etc/apache2/.htpasswd prabs "pakar_pinter_jadi_gob***"
+
+# Konfigurasi VirtualHost Reverse Proxy Penny dengan 301 Redirect ke www.k44.com (Soal 13)
+cat << 'EOF' > /etc/apache2/sites-available/vault-proxy.conf
+<VirtualHost *:80>
+    ServerName www.k44.com
+    ServerAlias penny.k44.com 192.233.4.2 k44.com vault.k44.com
+
+    ProxyRequests Off
+    ProxyPreserveHost On
+
+    # Redirect 301 Permanent jika dipanggil via IP / penny.k44.com (Soal 13)
+    RewriteEngine On
+    RewriteCond %{HTTP_HOST} ^192\.233\.4\.2$ [OR]
+    RewriteCond %{HTTP_HOST} ^penny\.k44\.com$ [NC]
+    RewriteRule ^(.*)$ http://www.k44.com$1 [R=301,L]
+
+    <Proxy balancer://vaultcluster>
+        BalancerMember http://192.233.6.2:80
+        BalancerMember http://192.233.6.3:80
+    </Proxy>
+
+    # Forwarding Header Identitas
+    RequestHeader set X-Real-IP "%{REMOTE_ADDR}s"
+    RequestHeader set X-Forwarded-For "%{REMOTE_ADDR}s"
+
+    # Basic Auth /admin (Soal 12)
+    <Location /admin>
+        AuthType Basic
+        AuthName "Restricted Area - Sindikat Admin"
+        AuthUserFile /etc/apache2/.htpasswd
+        Require valid-user
+    </Location>
+
+    ProxyPass / balancer://vaultcluster/
+    ProxyPassReverse / balancer://vaultcluster/
+</VirtualHost>
+EOF
+
+# Aktifkan site & restart service Apache
+a2ensite vault-proxy.conf
+a2dissite 000-default.conf
+/etc/init.d/apache2 restart
+```
+
+---
+
+#### Reverse Proxy Area Core `abbey` (Nginx - Redirect 302)
+
+**File / Lokasi:** `/root/script.sh` pada node **`abbey`**
+
+```bash
+#!/bin/bash
+
+# Set hostname
+hostname abbey
+
+# Install Nginx
+apt-get update
+apt-get install -y nginx
+
+# Configuration Reverse Proxy Nginx dengan 302 Redirect ke static.k44.com (Soal 13)
+cat << 'EOF' > /etc/nginx/sites-available/core-proxy
+upstream core_backend {
+    server 192.233.6.4:80;
+    server 192.233.6.5:80;
+}
+
+# Server block khusus penangkap IP Abbey & abbey.k44.com -> Redirect 302 (Soal 13)
 server {
     listen 80;
     server_name abbey.k44.com 192.233.3.2;
     return 302 http://static.k44.com$request_uri;
 }
 
+# Server block utama (Domain Kanonik: static.k44.com)
+server {
+    listen 80;
+    server_name static.k44.com core.k44.com;
+
+    location / {
+        proxy_pass http://core_backend;
+        
+        # Forwarding Header
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+}
+EOF
+
+# Symlink & restart service Nginx
+ln -sf /etc/nginx/sites-available/core-proxy /etc/nginx/sites-enabled/
+rm -f /etc/nginx/sites-enabled/default
+/etc/init.d/nginx restart
 ```
-
-
-
-
-* **Cara Pengujian (Di Terminal `alpha`):**
-
-```bash
-curl -I http://penny.k44.com
-curl -I http://abbey.k44.com
-
-```
-
-
 
 ---
 
-### 4. Soal Nomor 14: Logging IP Asli Client pada Server Backend
+### C. Cara Pengujian & Verifikasi Hasil
 
-* **Lokasi Pemasangan & Skrip:**
-* **Backend Vault (`obladi` & `desmond` - Apache)** $\rightarrow$ `/root/script.sh`:
+Pengujian dilakukan dari terminal Klien **`alpha`** dengan mengeksekusi `curl -I` untuk memeriksa *header* respons HTTP yang dikembalikan oleh masing-masing *reverse proxy*.
 
+#### Perintah Pengujian
+
+Jalankan perintah pengujian berikut di terminal **`alpha`**:
+
+```bash
+# 1. Tes Redirect 301 di Penny (IP & Hostname non-kanonik)
+curl -I http://192.233.4.2
+curl -I http://penny.k44.com
+
+# 2. Tes Redirect 302 di Abbey (IP & Hostname non-kanonik)
+curl -I http://192.233.3.2
+curl -I http://abbey.k44.com
+```
+
+---
+
+#### Ekspektasi Output Hasil Pengujian
+
+1. **Hasil Pengujian di Reverse Proxy `penny` (Apache):**
+* **Pengujian via IP (`[http://192.233.4.2](http://192.233.4.2)`):**
+```text
+HTTP/1.1 301 Moved Permanently
+Date: Sun, 04 Oct 2026 16:15:00 GMT
+Server: Apache/2.4.68 (Debian)
+Location: http://www.k44.com/
+Content-Type: text/html; charset=iso-8859-1
+```
+
+* **Pengujian via Subdomain (`[http://penny.k44.com](http://penny.k44.com)`):**
+```text
+HTTP/1.1 301 Moved Permanently
+Date: Sun, 04 Oct 2026 16:15:02 GMT
+Server: Apache/2.4.68 (Debian)
+Location: http://www.k44.com/
+Content-Type: text/html; charset=iso-8859-1
+```
+
+2. **Hasil Pengujian di Reverse Proxy `abbey` (Nginx):**
+* **Pengujian via IP (`[http://192.233.3.2](http://192.233.3.2)`):**
+```text
+HTTP/1.1 302 Moved Temporarily
+Server: nginx/1.22.1
+Date: Sun, 04 Oct 2026 16:15:05 GMT
+Content-Type: text/html
+Content-Length: 145
+Connection: keep-alive
+Location: http://static.k44.com/
+```
+
+
+* **Pengujian via Subdomain (`[http://abbey.k44.com](http://abbey.k44.com)`):**
+```text
+HTTP/1.1 302 Moved Temporarily
+Server: nginx/1.22.1
+Date: Sun, 04 Oct 2026 16:15:07 GMT
+Content-Type: text/html
+Content-Length: 145
+Connection: keep-alive
+Location: http://static.k44.com/
+
+```
+---
+
+## 14. Konfigurasi Logging IP Asli Klien pada Backend Server (Area Core & Vault)
+
+### A. Analisis Konfigurasi & Cara Kerja
+
+Pada **Soal Nomor 14**, fokus utama sistem adalah memastikan bahwa berkas *access log* pada seluruh web server *backend* (baik di Area Core maupun Area Vault) mencatat alamat IP asli milik pengunjung/klien (`alpha`: `192.233.1.2`), bukan mencatat IP dari *reverse proxy* (`abbey`: `192.233.3.2` atau `penny`: `192.233.4.2`).
+
+Berikut adalah rincian teknis pelaksanaan *real client IP logging* pada masing-masing web server *backend*:
+
+1. **Backend Area Core (`oblada` & `molly` - Nginx):**
+* **Modul `http_realip_module` Nginx:** Menggunakan arahan `set_real_ip_from 192.233.3.2;` untuk mendefinisikan bahwa IP *reverse proxy* `abbey` adalah sumber terpercaya.
+* **Real IP Header:** Arahan `real_ip_header X-Real-IP;` menginstruksikan Nginx untuk membaca *header* HTTP `X-Real-IP` yang dikirim oleh `abbey` dan menggantikan alamat IP koneksi fisik (`$remote_addr`) dengan IP asli klien di dalam sistem log internal Nginx.
+
+2. **Backend Area Vault (`obladi` & `desmond` - Apache2):**
+* **Modifikasi Format Log (`LogFormat` Override):** Mengganti penentu format log bawaan Debian/Apache (`%h` yang secara *default* mencatat IP fisik pengirim paket, yaitu Penny) secara langsung menggunakan `sed` menjadi `%{X-Forwarded-For}i` pada file `/etc/apache2/apache2.conf`.
+* Dengan perubahan ini, baris paling depan pada berkas `/var/log/apache2/access.log` dipaksa untuk membaca nilai dari *header* `X-Forwarded-For` yang disuntikkan oleh `penny`, sehingga IP klien pengakses tercatat secara presisi.
+
+3. **Parsing IP pada Skrip PHP Backend:**
+* Di sisi aplikasi web, skrip `index.php` pada kedua kluster menggunakan pengecekan hierarki *header* (`$_SERVER['HTTP_X_REAL_IP'] ?? $_SERVER['HTTP_X_FORWARDED_FOR'] ?? $_SERVER['REMOTE_ADDR']`) untuk memastikan nilai IP klien dapat dirender pada tampilan halaman web.
+---
+
+### B. Skrip Konfigurasi & Lokasi Pemasangan
+
+#### Node Backend Area Core (`oblada` & `molly` - Nginx)
+
+**File / Lokasi:** `/root/script.sh` pada node **`oblada`** dan **`molly`**
 
 ```bash
 #!/bin/bash
-apt-get update && apt-get install -y apache2 php libapache2-mod-php
+apt-get update
+apt-get install -y nginx php-fpm
+
+# Konfigurasi Nginx Default dengan Modul Real IP
+cat << 'EOF' > /etc/nginx/sites-available/default
+server {
+    listen 80 default_server;
+    root /var/www/html;
+    index index.php index.html;
+    server_name _;
+
+    # Konfigurasi Real IP Nginx dari Abbey (192.233.3.2)
+    set_real_ip_from 192.233.3.2; 
+    real_ip_header X-Real-IP;
+
+    location / {
+        try_files $uri $uri/ =404;
+    }
+    location ~ \.php$ {
+        include snippets/fastcgi-php.conf;
+        fastcgi_pass unix:/run/php/php-fpm.sock;
+    }
+}
+EOF
+
+# Buat file index.php pencatat IP
+cat << 'EOF' > /var/www/html/index.php
+<?php
+echo "Response from Core Backend: " . gethostname() . " (" . $_SERVER['SERVER_ADDR'] . ")\n";
+echo "Client IP Received: " . ($_SERVER['HTTP_X_REAL_IP'] ?? $_SERVER['HTTP_X_FORWARDED_FOR'] ?? $_SERVER['REMOTE_ADDR']) . "\n";
+?>
+EOF
+
+# Symlink PHP-FPM socket & restart service
+ln -sf $(ls /run/php/php*-fpm.sock | head -n 1) /run/php/php-fpm.sock
+/etc/init.d/php8.2-fpm start 2>/dev/null || php-fpm
+/etc/init.d/nginx restart
+```
+
+---
+
+#### Node Backend Area Vault (`obladi` & `desmond` - Apache)
+
+**File / Lokasi:** `/root/script.sh` pada node **`obladi`** dan **`desmond`**
+
+```bash
+#!/bin/bash
+apt-get update
+apt-get install -y apache2 php libapache2-mod-php
+
+# Ganti LogFormat bawaan Debian secara eksplisit ke header X-Forwarded-For
 sed -i 's/LogFormat "%h/LogFormat "%{X-Forwarded-For}i/g' /etc/apache2/apache2.conf
+
+# Buat file index.php pencatat IP
 cat << 'EOF' > /var/www/html/index.php
 <?php
 echo "Response from Vault Backend: " . gethostname() . " (" . $_SERVER['SERVER_ADDR'] . ")\n";
 echo "Client IP Received: " . ($_SERVER['HTTP_X_FORWARDED_FOR'] ?? $_SERVER['REMOTE_ADDR']) . "\n";
 ?>
 EOF
+
+# Bersihkan default index.html dan restart Apache
+rm -f /var/www/html/index.html
 /etc/init.d/apache2 restart
-
 ```
-
-
-* **Backend Core (`oblada` & `molly` - Nginx)** $\rightarrow$ Tambahkan konfigurasi `real_ip` pada blok `server` di `/root/script.sh`:
-
-
-```nginx
-set_real_ip_from 192.233.3.2; 
-real_ip_header X-Real-IP;
-
-```
-
-
-
-
-* **Cara Pengujian (Di Terminal `alpha` lalu Cek Log Backend):**
-
-```bash
-curl http://www.k44.com
-curl http://static.k44.com
-# Cek log:
-tail -n 2 /var/log/apache2/access.log  # (di obladi/desmond)
-tail -n 2 /var/log/nginx/access.log      # (di oblada/molly)
-
-```
-
-
 
 ---
 
-### 5. Soal Nomor 15: Jalur Khusus Bypass Proxy (`/eternal` & `/orion`)
+### C. Cara Pengujian & Verifikasi Hasil
 
-* **Lokasi Pemasangan & Skrip:**
-* **Node `penny` (Path `/eternal` dengan PHP)** $\rightarrow$ Tambahkan ke VirtualHost di `/root/script.sh`:
+Pengujian dilakukan dengan mengirimkan permintaan dari Klien **`alpha`** (`192.233.1.2`), kemudian memeriksa isi berkas *access log* secara langsung pada masing-masing server *backend*.
 
+#### Perintah Pengujian
 
-```apache
-Alias /eternal /var/www/eternal
-<Directory /var/www/eternal>
-    Require all granted
-</Directory>
-ProxyPass /eternal !
+Jalankan perintah pengujian secara berurutan:
 
+1. **Kirim Request dari Node Klien (`alpha`):**
+```bash
+# Akses Area Core via Domain Kanonik (Abbey -> Oblada/Molly)
+curl http://static.k44.com
+
+# Akses Area Vault via Domain Kanonik (Penny -> Obladi/Desmond)
+curl http://www.k44.com
 ```
 
-
-*(Serta buat folder `/var/www/eternal/index.php` berisi skrip PHP)*.
-
-
-* **Node `abbey` (Path `/orion` Statis Murni)** $\rightarrow$ Tambahkan ke server `static.k44.com` di `/root/script.sh`:
-
-
-```nginx
-location /orion {
-    alias /var/www/orion;
-    index index.html;
-}
-
+2. **Periksa Access Log pada Backend Area Core (`oblada` / `molly`):**
+```bash
+tail -n 2 /var/log/nginx/access.log
 ```
 
+3. **Periksa Access Log pada Backend Area Vault (`obladi` / `desmond`):**
+```bash
+tail -n 2 /var/log/apache2/access.log
+```
 
-*(Serta buat folder `/var/www/orion/index.html` berisi file HTML statis)*.
+---
 
+#### Ekspektasi Output Hasil Pengujian
 
+1. **Hasil Inspection Log pada Backend Area Core (`oblada` / `molly`):**
+```text
+192.233.1.2 - - [04/Oct/2026:16:30:01 +0700] "GET / HTTP/1.1" 200 95 "-" "curl/7.88.1"
+```
 
+2. **Hasil Inspection Log pada Backend Area Vault (`obladi` / `desmond`):**
+```text
+192.233.1.2 - - [04/Oct/2026:16:30:05 +0700] "GET / HTTP/1.1" 200 96 "-" "curl/7.88.1"
+```
 
-* **Cara Pengujian (Di Terminal `alpha`):**
+---
+
+## 15. Konfigurasi Path Bypass Proxy & Konten Lokal (/eternal & /orion)
+
+### A. Analisis Konfigurasi & Cara Kerja
+
+Pada **Soal Nomor 15**, dikonfigurasikan mekanisme *Proxy Bypass* (*Local Path Serving*) pada kedua server *reverse proxy* (`penny` dan `abbey`). Mekanisme ini menginstruksikan server proxy untuk melayani permintaan *path* tertentu secara langsung dari direktori lokal server proxy itu sendiri, tanpa meneruskannya (*forwarding*) ke kluster *backend*.
+
+Berikut adalah rincian teknis pelaksanaan *bypass* pada masing-masing server proxy:
+
+1. **Jalur Khusus `/eternal` pada `penny` (Apache2 - PHP Rendering):**
+* **Pemetaan Direktori (`Alias`):** Arahan `Alias /eternal /var/www/eternal` memetakan URL `[http://www.k44.com/eternal/](http://www.k44.com/eternal/)` secara langsung ke direktori fisik `/var/www/eternal` di dalam server `penny`.
+* **Aturan Bypass (`ProxyPass !`):** Instruksi `ProxyPass /eternal !` sangat krusial karena memberi tahu modul `mod_proxy` Apache bahwa *path* `/eternal` dikecualikan dari proses *load balancing* `balancer://vaultcluster`.
+* **PHP Rendering:** Berkas `/var/www/eternal/index.php` dieksekusi (*rendered*) langsung oleh modul PHP Apache lokal milik `penny`, yang dibuktikan dengan pemrosesan fungsi dinamik `date('Y-m-d H:i:s')`.
+
+2. **Jalur Khusus `/orion` pada `abbey` (Nginx - Statis Murni):**
+* **Pemetaan Direktori (`alias`):** Blok `location /orion` menggunakan arahan `alias /var/www/orion;` untuk mengarahkan akses `[http://static.k44.com/orion/](http://static.k44.com/orion/)` ke berkas statis di direktori `/var/www/orion`.
+* **Bypass Matching Order:** Nginx secara otomatis memprioritaskan kecocokan *location* paling spesifik (`location /orion`) dibandingkan kecocokan umum (`location /`). Karena `location /orion` tidak memiliki instruksi `proxy_pass`, Nginx melayaninya secara langsung sebagai konten HTML statis murni tanpa proses *rendering* PHP maupun pengiriman ke `core_backend`.
+
+---
+
+### B. Skrip Konfigurasi & Lokasi Pemasangan
+
+#### Node Reverse Proxy `penny` (Jalur `/eternal` dengan PHP)
+
+**File / Lokasi:** `/root/script.sh` pada node **`penny`**
 
 ```bash
+#!/bin/bash
+
+# 1. Buat folder dan file PHP untuk jalur Eternal
+mkdir -p /var/www/eternal
+cat << 'EOF' > /var/www/eternal/index.php
+<?php
+echo "<h3>[Penny] Jalur Eternal Berhasil Diakses!</h3>\n";
+echo "File PHP ini dirender langsung oleh Penny. Waktu: " . date('Y-m-d H:i:s') . "\n";
+?>
+EOF
+
+# 2. Konfigurasi VirtualHost Apache
+cat << 'EOF' > /etc/apache2/sites-available/vault-proxy.conf
+<VirtualHost *:80>
+    ServerName www.k44.com
+    ServerAlias penny.k44.com 192.233.4.2 k44.com vault.k44.com
+
+    ProxyRequests Off
+    ProxyPreserveHost On
+
+    # Redirect 301 (Soal 13)
+    RewriteEngine On
+    RewriteCond %{HTTP_HOST} ^192\.233\.4\.2$ [OR]
+    RewriteCond %{HTTP_HOST} ^penny\.k44\.com$ [NC]
+    RewriteRule ^(.*)$ http://www.k44.com$1 [R=301,L]
+
+    # Forwarding Header Identitas (Soal 14)
+    RequestHeader set X-Real-IP "%{REMOTE_ADDR}s"
+    RequestHeader set X-Forwarded-For "%{REMOTE_ADDR}s"
+
+    # Basic Authentication (Soal 12)
+    <Location /admin>
+        AuthType Basic
+        AuthName "Restricted Area - Sindikat Admin"
+        AuthUserFile /etc/apache2/.htpasswd
+        Require valid-user
+    </Location>
+
+    # --- SOAL 15: Jalur Khusus /eternal (Bypass Proxy) ---
+    Alias /eternal /var/www/eternal
+    <Directory /var/www/eternal>
+        Require all granted
+    </Directory>
+    # Tanda seru (!) berarti path ini TIDAK akan dilempar ke backend
+    ProxyPass /eternal !
+    # -----------------------------------------------------
+
+    <Proxy balancer://vaultcluster>
+        BalancerMember http://192.233.6.2:80
+        BalancerMember http://192.233.6.3:80
+    </Proxy>
+    
+    ProxyPass / balancer://vaultcluster/
+    ProxyPassReverse / balancer://vaultcluster/
+</VirtualHost>
+EOF
+
+# 3. Restart Apache
+/etc/init.d/apache2 restart
+```
+
+---
+
+#### Node Reverse Proxy `abbey` (Jalur `/orion` Statis)
+
+**File / Lokasi:** `/root/script.sh` pada node **`abbey`**
+
+```bash
+#!/bin/bash
+
+# 1. Buat folder dan file HTML statis untuk jalur Orion
+mkdir -p /var/www/orion
+cat << 'EOF' > /var/www/orion/index.html
+<h3>[Abbey] Jalur Orion Berhasil Diakses!</h3>
+<p>Ini adalah halaman statis murni tanpa proses rendering PHP.</p>
+EOF
+
+# 2. Konfigurasi Nginx
+cat << 'EOF' > /etc/nginx/sites-available/core-proxy
+upstream core_backend {
+    server 192.233.6.4:80;
+    server 192.233.6.5:80;
+}
+
+# Redirect 302 (Soal 13)
+server {
+    listen 80;
+    server_name abbey.k44.com 192.233.3.2;
+    return 302 http://static.k44.com$request_uri;
+}
+
+# Blok Server Utama
+server {
+    listen 80;
+    server_name static.k44.com core.k44.com;
+
+    # --- SOAL 15: Jalur Khusus /orion statis (Bypass Proxy) ---
+    location /orion {
+        alias /var/www/orion;
+        index index.html;
+    }
+    # ----------------------------------------------------------
+
+    # Reverse Proxy ke Backend
+    location / {
+        proxy_pass http://core_backend;
+        
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+}
+EOF
+
+# 3. Restart Nginx
+/etc/init.d/nginx restart
+```
+
+---
+
+#### Cara Pengujian & Verifikasi Hasil
+
+Pengujian dilakukan dari terminal Klien **`alpha`** dengan mengeksekusi `curl` ke masing-masing *path* khusus pada domain kanonik.
+
+##### Perintah Pengujian
+
+Jalankan perintah pengujian berikut pada terminal **`alpha`**:
+
+```bash
+# 1. Uji Jalur Eternal di Penny (PHP Rendering)
 curl http://www.k44.com/eternal/
+
+# 2. Uji Jalur Orion di Abbey (HTML Statis Murni)
 curl http://static.k44.com/orion/
+```
+
+---
+
+##### Ekspektasi Output Hasil Pengujian
+
+1. **Hasil Pengujian Jalur `/eternal/` di `penny`:**
+```html
+<h3>[Penny] Jalur Eternal Berhasil Diakses!</h3>
+File PHP ini dirender langsung oleh Penny. Waktu: 2026-09-30 10:14:51
+```
+
+2. **Hasil Pengujian Jalur `/orion/` di `abbey`:**
+```html
+<h3>[Abbey] Jalur Orion Berhasil Diakses!</h3>
+<p>Ini adalah halaman statis murni tanpa proses rendering PHP.</p>
 
 ```
 
